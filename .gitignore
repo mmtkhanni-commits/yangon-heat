@@ -1,0 +1,8 @@
+.streamlit/
+.env
+data/
+*.db
+__pycache__/
+*.pyc
+cache/
+Backend/cache/

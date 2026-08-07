@@ -1,0 +1,16 @@
+# Copy to .env and fill in. Never commit the real .env.
+
+# Leave unset to use SQLite locally. Required in production — hosted platforms
+# wipe local disk on restart and would take reports and subscriptions with it.
+# DATABASE_URL=postgresql://user:password@host/dbname
+
+# Comma-separated frontend origins allowed to call this API. "*" for local dev.
+ALLOWED_ORIGINS=*
+
+# Email alerts. With these unset send_alerts.py reports what it would send and
+# sends nothing, which makes it safe to run first.
+# SMTP_HOST=smtp.gmail.com
+# SMTP_PORT=587
+# SMTP_USER=you@gmail.com
+# SMTP_PASSWORD=your-app-password
+# ALERT_FROM=you@gmail.com
