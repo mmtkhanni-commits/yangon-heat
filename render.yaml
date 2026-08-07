@@ -29,7 +29,7 @@ services:
   - type: web
     name: yangon-heat-app
     runtime: static
-    rootDir: frontend
+    rootDir: Frontend
     staticPublishPath: .
     headers:
       - path: /sw.js
@@ -40,24 +40,31 @@ services:
         source: /*
         destination: /index.html
 
-  - type: cron
-    name: yangon-heat-alerts
-    runtime: python
-    plan: free
-    rootDir: backend
-    schedule: "0 * * * *"    # hourly, on the hour
-    buildCommand: pip install -r requirements.txt
-    startCommand: python send_alerts.py
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: yangon-heat-db
-          property: connectionString
-      - key: SMTP_HOST
-        sync: false
-      - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASSWORD
-        sync: false
-      - key: ALERT_FROM
-        sync: false
+# The hourly alert job runs on GitHub Actions instead of a Render cron service,
+# because Render has no free plan for cron. See .github/workflows/alerts.yml —
+# add DATABASE_URL, SMTP_HOST, SMTP_USER, SMTP_PASSWORD and ALERT_FROM under
+# Settings > Secrets and variables > Actions.
+#
+# If you would rather run it here, uncomment this block and pick a paid plan:
+#
+#  - type: cron
+#    name: yangon-heat-alerts
+#    runtime: python
+#    plan: starter
+#    rootDir: backend
+#    schedule: "0 * * * *"
+#    buildCommand: pip install -r requirements.txt
+#    startCommand: python send_alerts.py
+#    envVars:
+#      - key: DATABASE_URL
+#        fromDatabase:
+#          name: yangon-heat-db
+#          property: connectionString
+#      - key: SMTP_HOST
+#        sync: false
+#      - key: SMTP_USER
+#        sync: false
+#      - key: SMTP_PASSWORD
+#        sync: false
+#      - key: ALERT_FROM
+#        sync: false
