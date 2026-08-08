@@ -736,8 +736,8 @@ async function toggleSatellite(key, path, checkbox) {
 
     $('satNote').className = 'formnote ok';
     $('satNote').textContent = key === 'lst'
-      ? say(`ပုံ ${layer.scenes} ပုံမှ ပေါင်းစပ်ထားသည် · နောက်ဆုံး ${layer.latest_pass} · ${layer.min}–${layer.max}°C`,
-            `Composite of ${layer.scenes} scenes · latest ${layer.latest_pass} · ${layer.min}–${layer.max}°C`)
+      ? say(`ပုံ ${layer.scenes} ပုံ · နောက်ဆုံး ${layer.latest_pass} · ${layer.min}–${layer.max}°C · ${layer.clipped_to || ''}`,
+            `${layer.scenes} scenes · latest ${layer.latest_pass} · ${layer.min}–${layer.max}°C · clipped to ${layer.clipped_to || 'unknown'}`)
       : say(`Sentinel-2 ပုံ ${layer.scenes} ပုံ · အညို = ဗလာ၊ အစိမ်း = သစ်ပင်ထူထပ်`,
             `${layer.scenes} Sentinel-2 scenes · brown = bare, green = dense vegetation`);
   } catch (error) {
@@ -912,63 +912,105 @@ function renderCompare() {
 // Small scenes drawn inline rather than shipped as images, so they follow the
 // palette, animate, and cost nothing to load.
 const ART = {
-  comfortable: `<svg viewBox="0 0 80 80" width="78" height="78">
-    <circle cx="40" cy="40" r="30" fill="#1B3326"/>
+  // A small character who acts out the advice, so the guidance reads at a
+  // glance even for someone skimming. Built from plain shapes: no image files,
+  // themes with the palette, and animates.
+  comfortable: `<svg viewBox="0 0 90 90" width="78" height="78">
+    <circle cx="45" cy="45" r="42" fill="#1B3326"/>
     <g class="sway">
-      <rect x="38" y="46" width="4" height="16" rx="1.5" fill="#6b4b32"/>
-      <circle cx="40" cy="41" r="15" fill="#4E9E7E"/>
-      <circle cx="33" cy="37" r="9" fill="#7CC49B"/>
-      <circle cx="47" cy="39" r="7" fill="#3d8f6d"/>
+      <rect x="14" y="52" width="3" height="16" rx="1.5" fill="#6b4b32"/>
+      <circle cx="15.5" cy="49" r="11" fill="#3d8f6d"/>
+      <circle cx="11" cy="45" r="6" fill="#4E9E7E"/>
     </g>
-    <circle cx="62" cy="20" r="7" fill="#E3A857" class="shimmer"/>
+    <circle cx="72" cy="20" r="8" fill="#E3A857" class="shimmer"/>
+    <g class="bob">
+      <path d="M35 78 h20 l-3 -20 h-14z" fill="#4E9E7E"/>
+      <circle cx="45" cy="44" r="13" fill="#F2D2B3"/>
+      <path d="M32 42 a13 13 0 0 1 26 0 q-4 -7 -13 -7 t-13 7z" fill="#2E241F"/>
+      <circle cx="40" cy="45" r="1.8" fill="#2E241F"/>
+      <circle cx="50" cy="45" r="1.8" fill="#2E241F"/>
+      <path d="M41 51 q4 4 8 0" stroke="#2E241F" stroke-width="1.6"
+            fill="none" stroke-linecap="round"/>
+      <circle cx="35" cy="49" r="2.4" fill="#E89A9A" opacity="0.55"/>
+      <circle cx="55" cy="49" r="2.4" fill="#E89A9A" opacity="0.55"/>
+    </g>
   </svg>`,
 
-  warm: `<svg viewBox="0 0 80 80" width="78" height="78">
-    <circle cx="40" cy="40" r="30" fill="#1B3326"/>
-    <circle cx="59" cy="21" r="9" fill="#E3A857" class="shimmer"/>
+  warm: `<svg viewBox="0 0 90 90" width="78" height="78">
+    <circle cx="45" cy="45" r="42" fill="#1B3326"/>
+    <circle cx="71" cy="20" r="9" fill="#E3A857" class="shimmer"/>
     <g class="sway">
-      <rect x="24" y="44" width="3.5" height="18" rx="1.5" fill="#6b4b32"/>
-      <circle cx="26" cy="40" r="13" fill="#4E9E7E"/>
-      <circle cx="21" cy="36" r="7" fill="#7CC49B"/>
+      <rect x="14" y="54" width="3" height="14" rx="1.5" fill="#6b4b32"/>
+      <circle cx="15.5" cy="50" r="10" fill="#3d8f6d"/>
     </g>
     <g class="bob">
-      <rect x="50" y="42" width="13" height="22" rx="5" fill="#3D8FA6"/>
-      <rect x="52" y="46" width="9" height="15" rx="3" fill="#7CC49B" opacity="0.85"/>
-      <rect x="53" y="38" width="7" height="5" rx="2" fill="#B7E4C7"/>
-    </g>
-  </svg>`,
-
-  warning: `<svg viewBox="0 0 80 80" width="78" height="78">
-    <circle cx="40" cy="40" r="30" fill="#2b2419"/>
-    <circle cx="40" cy="26" r="12" fill="#E3A857" class="shimmer"/>
-    <g stroke="#E3A857" stroke-width="2.5" stroke-linecap="round" class="shimmer">
-      <line x1="40" y1="6" x2="40" y2="11"/>
-      <line x1="22" y1="26" x2="17" y2="26"/>
-      <line x1="63" y1="26" x2="58" y2="26"/>
-      <line x1="26" y1="12" x2="23" y2="9"/>
-      <line x1="54" y1="12" x2="57" y2="9"/>
+      <path d="M35 78 h20 l-3 -20 h-14z" fill="#4E9E7E"/>
+      <circle cx="45" cy="44" r="13" fill="#F2D2B3"/>
+      <path d="M32 42 a13 13 0 0 1 26 0 q-4 -7 -13 -7 t-13 7z" fill="#2E241F"/>
+      <circle cx="40" cy="45" r="1.8" fill="#2E241F"/>
+      <circle cx="50" cy="45" r="1.8" fill="#2E241F"/>
+      <path d="M41 51 q4 3 8 0" stroke="#2E241F" stroke-width="1.6"
+            fill="none" stroke-linecap="round"/>
+      <circle cx="35" cy="49" r="2.4" fill="#E89A9A" opacity="0.6"/>
+      <circle cx="55" cy="49" r="2.4" fill="#E89A9A" opacity="0.6"/>
     </g>
     <g class="sip">
-      <rect x="30" y="48" width="16" height="20" rx="4" fill="#3D8FA6"/>
-      <rect x="33" y="52" width="10" height="13" rx="2" fill="#7CC49B"/>
-      <rect x="34" y="44" width="8" height="5" rx="2" fill="#B7E4C7"/>
+      <rect x="58" y="54" width="11" height="18" rx="4" fill="#3D8FA6"/>
+      <rect x="60" y="58" width="7" height="12" rx="2" fill="#7CC49B"/>
+      <rect x="61" y="50" width="5" height="5" rx="2" fill="#B7E4C7"/>
     </g>
-    <path d="M52 52 q6 -8 6 -13 q0 5 6 13 a6 6 0 1 1 -12 0z" fill="#7CC49B" class="bob"/>
   </svg>`,
 
-  danger: `<svg viewBox="0 0 80 80" width="78" height="78">
-    <circle cx="40" cy="40" r="30" fill="#31201c"/>
-    <circle cx="40" cy="24" r="13" fill="#C9502F" class="shimmer"/>
-    <g stroke="#A31E1E" stroke-width="3" stroke-linecap="round" class="shimmer">
-      <line x1="40" y1="3" x2="40" y2="9"/>
-      <line x1="19" y1="24" x2="13" y2="24"/>
-      <line x1="61" y1="24" x2="67" y2="24"/>
+  warning: `<svg viewBox="0 0 90 90" width="78" height="78">
+    <circle cx="45" cy="45" r="42" fill="#2b2419"/>
+    <circle cx="45" cy="17" r="9" fill="#E3A857" class="shimmer"/>
+    <g stroke="#E3A857" stroke-width="2.2" stroke-linecap="round" class="shimmer">
+      <line x1="45" y1="2" x2="45" y2="6"/>
+      <line x1="30" y1="17" x2="26" y2="17"/>
+      <line x1="60" y1="17" x2="64" y2="17"/>
     </g>
     <g class="bob">
-      <path d="M20 62 q10 -22 20 -22 q10 0 20 22z" fill="#235138"/>
-      <rect x="36" y="58" width="8" height="10" rx="2" fill="#4E9E7E"/>
+      <path d="M35 78 h20 l-3 -20 h-14z" fill="#4E9E7E"/>
+      <circle cx="45" cy="46" r="13" fill="#F2D2B3"/>
+      <!-- wide-brimmed hat for the midday sun -->
+      <ellipse cx="45" cy="36" rx="19" ry="5" fill="#C9A227"/>
+      <path d="M35 36 a10 8 0 0 1 20 0z" fill="#E3A857"/>
+      <circle cx="40" cy="47" r="1.8" fill="#2E241F"/>
+      <circle cx="50" cy="47" r="1.8" fill="#2E241F"/>
+      <path d="M41 53 q4 2 8 0" stroke="#2E241F" stroke-width="1.6"
+            fill="none" stroke-linecap="round"/>
+      <circle cx="35" cy="51" r="2.4" fill="#E89A9A" opacity="0.7"/>
+      <circle cx="55" cy="51" r="2.4" fill="#E89A9A" opacity="0.7"/>
     </g>
-    <text x="40" y="52" text-anchor="middle" font-size="13" fill="#B7E4C7">🏠</text>
+    <g class="sip">
+      <rect x="60" y="56" width="11" height="18" rx="4" fill="#3D8FA6"/>
+      <rect x="62" y="60" width="7" height="12" rx="2" fill="#7CC49B"/>
+    </g>
+  </svg>`,
+
+  danger: `<svg viewBox="0 0 90 90" width="78" height="78">
+    <circle cx="45" cy="45" r="42" fill="#31201c"/>
+    <circle cx="45" cy="15" r="10" fill="#C9502F" class="shimmer"/>
+    <g stroke="#A31E1E" stroke-width="2.6" stroke-linecap="round" class="shimmer">
+      <line x1="45" y1="1" x2="45" y2="5"/>
+      <line x1="28" y1="15" x2="23" y2="15"/>
+      <line x1="62" y1="15" x2="67" y2="15"/>
+    </g>
+    <!-- indoors: the roofline says stay in -->
+    <path d="M16 52 L45 34 L74 52 Z" fill="#235138"/>
+    <rect x="22" y="52" width="46" height="26" rx="3" fill="#1A2E24"/>
+    <g class="bob">
+      <path d="M37 78 h16 l-2 -14 h-12z" fill="#4E9E7E"/>
+      <circle cx="45" cy="60" r="10" fill="#F2D2B3"/>
+      <path d="M35 58 a10 10 0 0 1 20 0 q-3 -5 -10 -5 t-10 5z" fill="#2E241F"/>
+      <circle cx="41" cy="61" r="1.5" fill="#2E241F"/>
+      <circle cx="49" cy="61" r="1.5" fill="#2E241F"/>
+      <path d="M42 66 q3 2 6 0" stroke="#2E241F" stroke-width="1.4"
+            fill="none" stroke-linecap="round"/>
+    </g>
+    <g class="sip">
+      <rect x="58" y="62" width="9" height="14" rx="3" fill="#3D8FA6"/>
+    </g>
   </svg>`,
 };
 
@@ -1203,10 +1245,15 @@ function drawTreeScene(pct, drop, baseTemp) {
              </span>`;
   }
 
-  // a couple of birds arrive once the canopy is worth living in
-  if (trees >= 5) {
-    html += `<span class="bird" style="left:22%;top:22%"></span>`;
-    html += `<span class="bird" style="left:64%;top:15%;animation-delay:1.1s"></span>`;
+  // birds arrive as soon as there is a canopy worth living in
+  if (trees >= 2) {
+    html += `<span class="bird" style="left:20%;top:20%"></span>`;
+  }
+  if (trees >= 4) {
+    html += `<span class="bird" style="left:58%;top:13%;animation-delay:1.1s"></span>`;
+  }
+  if (trees >= 7) {
+    html += `<span class="bird" style="left:78%;top:26%;animation-delay:2.2s"></span>`;
   }
 
   html += `<span class="drop">${baseTemp}° → ${(baseTemp - drop).toFixed(1)}°</span>`;
@@ -1586,11 +1633,25 @@ async function start() {
     }
   });
 
+  $('navInstall').addEventListener('click', () => {
+    closeDrawer();
+    if (isStandalone()) {
+      toast(say('ဤစက်တွင် တင်ပြီးသားပါ။', 'Already installed on this device.'));
+      return;
+    }
+    if (isIOS()) { iosInstructions(); return; }
+    if (deferredInstall) { runInstall(); return; }
+    toast(say('Browser menu ထဲမှ “Add to Home screen” ကို ရွေးပါ။',
+              'Open the browser menu and choose "Add to Home screen".'));
+  });
+
   $('installGo').addEventListener('click', runInstall);
   $('installDismiss').addEventListener('click', () => {
     $('installBar').hidden = true;
     localStorage.setItem(`${STORE}:install-dismissed`, '1');
   });
+
+  if (isStandalone()) $('navInstall').hidden = true;
 
   // Safari never announces itself, so offer the walkthrough after a short wait
   if (isIOS() && !isStandalone()) {

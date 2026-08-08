@@ -4,8 +4,8 @@
    The API now lives on its own origin, so cross-origin requests are passed
    straight through rather than intercepted — trying to cache them here was
    turning a slow response into a failed one. */
-const SHELL = 'yangon-heat-shell-v11';
-const DATA = 'yangon-heat-data-v11';
+const SHELL = 'yangon-heat-shell-v12';
+const DATA = 'yangon-heat-data-v12';
 const FILES = ['./', './index.html', './styles.css', './app.js',
                './manifest.json', './privacy.html'];
 

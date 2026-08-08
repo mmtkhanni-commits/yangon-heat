@@ -1331,3 +1331,63 @@ h3.sub { font-size: 13.5px; margin: 18px 0 8px; color: var(--text); font-family:
 
 .gauge { height: 6px; border-radius: 3px; background: var(--moss); margin-top: 9px; overflow: hidden; }
 .gauge i { display: block; height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+
+
+/* ═══════════════════════════════════ spacing between stacked panels ═════ */
+
+/* The panels became <div> when the dashboard was built, so the old
+   `section { margin-top }` rule stopped applying and they ran together. */
+.view > * + * { margin-top: 16px; }
+.view > .panel, .view > .hero { margin-top: 0; }
+.view > *:not(:first-child) { margin-top: 16px; }
+
+.panel { margin: 0; }
+.panel > * + * { margin-top: 10px; }
+.panel h2 + .note { margin-top: 4px; }
+.panel .note + * { margin-top: 12px; }
+
+.hero { margin: 0; }
+.hero > * + * { margin-top: 0; }
+
+/* breathing room inside the grids that were touching */
+.tiles { gap: 12px; }
+.cmp { gap: 10px; }
+.chips { gap: 10px; }
+.air-hero { gap: 12px; }
+
+#map { margin: 12px 0; }
+.legend { margin-top: 12px; }
+.scale { margin-top: 10px; }
+.sat { margin-top: 16px; padding-top: 14px; }
+.ghost { margin-top: 14px; }
+
+.ribbon { margin: 12px 0 8px; }
+.chart-wrap { margin-top: 12px; }
+.scene { margin: 4px 0 16px; }
+.who-bar { margin: 12px 0; }
+.rank { margin-top: 10px; }
+
+h3.sub { margin-top: 22px; }
+h3.sub + .note { margin-top: 4px; }
+
+footer { margin-top: 28px; }
+
+
+/* the mic is an icon button, not a text button */
+.mic {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.mic:hover { color: var(--shoot); border-color: var(--shoot); }
+.mic.recording { color: #fff; }
+
+/* install always reachable from the nav, separated from the section list */
+.nav-install {
+  margin-top: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 10px 10px;
+  color: var(--shoot);
+}
+.nav-install:hover { background: var(--fern); }

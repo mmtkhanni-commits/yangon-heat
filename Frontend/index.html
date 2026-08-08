@@ -83,6 +83,11 @@
       <span class="ico" aria-hidden="true">👥</span>
       <span data-my="အကြံပြုရန်" data-en="Report">အကြံပြုရန်</span>
     </button>
+
+    <button class="nav-item nav-install" id="navInstall" type="button">
+      <span class="ico" aria-hidden="true">📲</span>
+      <span data-my="ဖုန်းမှာ တင်ရန်" data-en="Install app">ဖုန်းမှာ တင်ရန်</span>
+    </button>
   </nav>
 
   <div class="scrim" id="scrim" hidden></div>
@@ -361,7 +366,14 @@
     <form id="chatForm" class="chat-form">
       <input type="text" id="chatInput" maxlength="600"
              placeholder="မေးခွန်း ရိုက်ပါ… / Type a question…" autocomplete="off">
-      <button type="button" id="micBtn" class="mic" aria-label="Ask by voice">🎙</button>
+      <button type="button" id="micBtn" class="mic" aria-label="Ask by voice">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+             stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+          <rect x="9" y="3" width="6" height="11" rx="3"/>
+          <path d="M5 11a7 7 0 0 0 14 0"/>
+          <line x1="12" y1="18" x2="12" y2="21"/>
+        </svg>
+      </button>
       <button type="submit" aria-label="Send">↑</button>
     </form>
   </div>

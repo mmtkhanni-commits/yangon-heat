@@ -88,7 +88,11 @@ def init():
 
 def status():
     ready, message = init()
-    return {"ready": ready, "message": message, "installed": EE_INSTALLED}
+    townships, meta = sources.get_townships()
+    with_shape = sum(1 for t in townships if t.get("geometry"))
+    return {"ready": ready, "message": message, "installed": EE_INSTALLED,
+            "polygons_available": with_shape,
+            "clip": "township outline" if with_shape else "bounding box"}
 
 
 _region_cache = {}
@@ -100,13 +104,17 @@ def _region():
     if "geom" in _region_cache:
         return _region_cache["geom"]
 
-    townships, meta = sources.get_townships()
-    shapes = [ee.Geometry(t["geometry"]) for t in townships if t.get("geometry")]
+    townships, _ = sources.get_townships()
+    shapes = [t["geometry"] for t in townships if t.get("geometry")]
 
     if shapes:
-        geom = ee.FeatureCollection([ee.Feature(s) for s in shapes]).geometry().dissolve(100)
+        collection = ee.FeatureCollection([ee.Feature(ee.Geometry(s)) for s in shapes])
+        # union() merges the 43 polygons into one outline; maxError keeps it cheap
+        geom = collection.union(200).geometry()
+        _region_cache["shape"] = f"{len(shapes)} township polygons"
     else:
         geom = ee.Geometry.Rectangle(YANGON_RECT)
+        _region_cache["shape"] = "bounding box (no boundary file)"
 
     _region_cache["geom"] = geom
     return geom
@@ -154,6 +162,8 @@ def lst_layer(days_back=60):
 
     composite = (collection.map(_mask_landsat).map(_to_celsius)
                  .median().clip(_region()))
+    composite = composite.updateMask(
+        ee.Image.constant(1).clip(_region()).mask())
     stats = composite.reduceRegion(
         reducer=ee.Reducer.percentile([2, 98]), geometry=_region(),
         scale=200, maxPixels=1e9, bestEffort=True).getInfo()
@@ -178,6 +188,7 @@ def lst_layer(days_back=60):
         "max": round(high, 1),
         "palette": LST_PALETTE,
         "unit": "°C",
+        "clipped_to": _region_cache.get("shape", "unknown"),
     }
 
 
@@ -206,6 +217,7 @@ def ndvi_layer(days_back=120):
 
     ndvi = (collection.map(mask_s2).median()
             .normalizedDifference(["B8", "B4"]).rename("NDVI").clip(_region()))
+    ndvi = ndvi.updateMask(ee.Image.constant(1).clip(_region()).mask())
     vis = {"min": 0.0, "max": 0.8, "palette": NDVI_PALETTE}
 
     return {
@@ -215,6 +227,7 @@ def ndvi_layer(days_back=120):
         "max": 0.8,
         "palette": NDVI_PALETTE,
         "unit": "NDVI",
+        "clipped_to": _region_cache.get("shape", "unknown"),
     }
 
 
