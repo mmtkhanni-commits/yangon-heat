@@ -1,16 +1,95 @@
 {
+  "id": "/",
   "name": "ရန်ကုန် အပူအခြေအနေ · Yangon Heat",
   "short_name": "Yangon Heat",
-  "description": "ရန်ကုန်မြို့နယ် ၄၄ ခုရဲ့ လက်ရှိအပူချိန်နဲ့ လေထုအရည်အသွေး။",
-  "start_url": "./index.html",
-  "scope": "./",
+  "description": "ရန်ကုန်မြို့နယ် ၄၄ ခု၏ လက်ရှိအပူချိန်၊ လေထုအရည်အသွေးနှင့် အပူကျွန်းအခြေအနေ။ Live temperature, PM2.5 and urban heat island readings for all 44 townships of Yangon.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
   "orientation": "portrait",
   "background_color": "#0D1117",
   "theme_color": "#0D1117",
   "lang": "my",
+  "dir": "ltr",
+  "categories": [
+    "weather",
+    "health",
+    "utilities"
+  ],
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "ယနေ့ အပူချိန် · Today",
+      "short_name": "ယနေ့",
+      "url": "/?view=today",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "လေထုအရည်အသွေး · Air quality",
+      "short_name": "လေထု",
+      "url": "/?view=air",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "မြေပုံ · Map",
+      "short_name": "မြေပုံ",
+      "url": "/?view=map",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshot-phone.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "ယနေ့ အပူအခြေအနေ"
+    },
+    {
+      "src": "screenshot-wide.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Dashboard"
+    }
   ]
 }

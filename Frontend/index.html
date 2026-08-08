@@ -19,6 +19,9 @@
 
 <div class="topbar-wrap">
 <header class="topbar">
+  <button class="burger" id="burger" type="button" aria-label="Menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
   <div class="brand">
     <span class="pulse" id="feedDot" aria-hidden="true"></span>
     <div>
@@ -26,220 +29,336 @@
       <p class="stamp" id="stamp">တင်နေသည်…</p>
     </div>
   </div>
-  <button class="lang" id="langToggle" type="button" aria-label="Switch language">EN</button>
+  <div class="topbar-actions">
+    <button class="icon-btn" id="bellBtn" type="button" aria-label="Notifications">
+      <span aria-hidden="true">🔔</span>
+      <em class="dot" id="bellDot" hidden></em>
+    </button>
+    <button class="lang" id="langToggle" type="button" aria-label="Switch language">EN</button>
+  </div>
 </header>
 </div>
 
-<main>
+<div class="install" id="installBar" hidden>
+  <span class="install-icon" aria-hidden="true">
+    <span class="fab-robot">
+      <span class="robot-head"></span><span class="robot-body"></span>
+      <span class="robot-arm-left"></span><span class="robot-arm-right"></span>
+    </span>
+  </span>
+  <div class="install-text">
+    <b id="installTitle"></b>
+    <span id="installBody"></span>
+  </div>
+  <div class="install-actions">
+    <button class="install-go" id="installGo" type="button"></button>
+    <button class="install-x" id="installDismiss" type="button" aria-label="Dismiss">✕</button>
+  </div>
+</div>
 
-  <!-- hero: the one question a resident actually has -->
-  <section class="hero" id="hero" aria-live="polite">
-    <div class="hero-head">
-      <label class="pick">
-        <span class="pick-label" data-my="မြို့နယ်" data-en="Township">မြို့နယ်</span>
-        <select id="townshipPick" aria-label="Choose township"></select>
-      </label>
-      <button class="locate" id="locateBtn" type="button">
-        <span data-my="တည်နေရာသုံးမည်" data-en="Use my location">တည်နေရာသုံးမည်</span>
-      </button>
-    </div>
+<div class="shell">
 
-    <p class="reading"><span id="temp">--</span><span class="unit">°C</span></p>
-    <p class="verdict" id="verdict">…</p>
-    <p class="advice" id="advice"></p>
+  <nav class="sidenav" id="sidenav" aria-label="Sections">
+    <button class="nav-item is-active" data-view="today">
+      <span class="ico" aria-hidden="true">🌡</span>
+      <span data-my="ယနေ့" data-en="Today">ယနေ့</span>
+    </button>
+    <button class="nav-item" data-view="map">
+      <span class="ico" aria-hidden="true">🗺</span>
+      <span data-my="မြေပုံ" data-en="Map">မြေပုံ</span>
+    </button>
+    <button class="nav-item" data-view="air">
+      <span class="ico" aria-hidden="true">💨</span>
+      <span data-my="လေထု" data-en="Air">လေထု</span>
+    </button>
+    <button class="nav-item" data-view="compare">
+      <span class="ico" aria-hidden="true">⚖️</span>
+      <span data-my="နှိုင်းယှဉ်" data-en="Compare">နှိုင်းယှဉ်</span>
+    </button>
+    <button class="nav-item" data-view="trees">
+      <span class="ico" aria-hidden="true">🌳</span>
+      <span data-my="သစ်ပင်" data-en="Trees">သစ်ပင်</span>
+    </button>
+    <button class="nav-item" data-view="history">
+      <span class="ico" aria-hidden="true">📉</span>
+      <span data-my="သမိုင်း" data-en="History">သမိုင်း</span>
+    </button>
+    <button class="nav-item" data-view="alerts">
+      <span class="ico" aria-hidden="true">🔔</span>
+      <span data-my="သတိပေးချက်" data-en="Alerts">သတိပေးချက်</span>
+    </button>
+    <button class="nav-item" data-view="report">
+      <span class="ico" aria-hidden="true">👥</span>
+      <span data-my="အကြံပြုရန်" data-en="Report">အကြံပြုရန်</span>
+    </button>
+  </nav>
 
-    <dl class="chips">
-      <div><dt data-my="ခံစားရသော" data-en="Feels like">ခံစားရသော</dt><dd id="feels">--</dd></div>
-      <div><dt data-my="လေထုအရည်အသွေး" data-en="Air quality">လေထုအရည်အသွေး</dt><dd id="aqi">--</dd></div>
-      <div><dt data-my="မြို့ပျမ်းမျှနှင့်" data-en="vs city">မြို့ပျမ်းမျှနှင့်</dt><dd id="anomaly">--</dd></div>
-    </dl>
-  </section>
+  <div class="scrim" id="scrim" hidden></div>
 
-  <!-- signature element: the whole city as one strip, hottest to coolest -->
-  <section class="panel">
-    <h2 data-my="မြို့တစ်ခုလုံး" data-en="The whole city">မြို့တစ်ခုလုံး</h2>
-    <p class="note" data-my="မြို့နယ် ၄၄ ခု — အပူဆုံးမှ အအေးဆုံးသို့။ တစ်ခုချင်း နှိပ်ကြည့်ပါ။"
-       data-en="All 44 townships, hottest to coolest. Tap any bar.">
-       မြို့နယ် ၄၄ ခု — အပူဆုံးမှ အအေးဆုံးသို့။ တစ်ခုချင်း နှိပ်ကြည့်ပါ။</p>
-    <div class="ribbon" id="ribbon" role="list"></div>
-    <div class="ribbon-ends">
-      <span id="ribbonHot"></span>
-      <span id="ribbonCool"></span>
-    </div>
-  </section>
+  <main>
 
-  <!-- map -->
-  <section class="panel">
-    <h2 data-my="မြေပုံ" data-en="Map">မြေပုံ</h2>
-    <p class="note" data-my="မြို့နယ်တစ်ခုချင်း အပူချိန်အလိုက် အရောင်ခြယ်ထားသည်။ နှိပ်ပြီး ရွေးနိုင်သည်။"
-       data-en="Each township is shaded by its temperature. Tap one to select it.">
-       မြို့နယ်တစ်ခုချင်း အပူချိန်အလိုက် အရောင်ခြယ်ထားသည်။ နှိပ်ပြီး ရွေးနိုင်သည်။</p>
-    <div id="map" role="application" aria-label="Township temperature map"></div>
-    <div class="legend">
-      <span><i class="pin hot">🔥</i>
-        <b data-my="အဆင့် ၄–၅" data-en="Level 4–5">အဆင့် ၄–၅</b>
-        <em data-my="မြို့ပျမ်းမျှထက် အလွန်ပူ" data-en="well above the city average">မြို့ပျမ်းမျှထက် အလွန်ပူ</em></span>
-      <span><i class="pin mid">❗</i>
-        <b data-my="အဆင့် ၂–၃" data-en="Level 2–3">အဆင့် ၂–၃</b>
-        <em data-my="မြို့ပျမ်းမျှခန့်" data-en="near the city average">မြို့ပျမ်းမျှခန့်</em></span>
-      <span><i class="pin cool">🍃</i>
-        <b data-my="အဆင့် ၁" data-en="Level 1">အဆင့် ၁</b>
-        <em data-my="မြို့ပျမ်းမျှထက် အေး" data-en="cooler than the city average">မြို့ပျမ်းမျှထက် အေး</em></span>
-    </div>
+    <section class="view is-active" id="view-today">
+      <div class="hero" id="hero" aria-live="polite">
+        <div class="hero-head">
+          <label class="pick">
+            <span class="pick-label" data-my="မြို့နယ်" data-en="Township">မြို့နယ်</span>
+            <select id="townshipPick" aria-label="Choose township"></select>
+          </label>
+          <button class="locate" id="locateBtn" type="button">
+            <span data-my="တည်နေရာသုံးမည်" data-en="Use my location">တည်နေရာသုံးမည်</span>
+          </button>
+        </div>
 
-    <div class="scale" id="mapScale"></div>
-    <div class="sat" id="satControls" hidden>
-      <p class="note" data-my="ဂြိုဟ်တုပုံများ — ၈ မှ ၁၆ ရက်တစ်ကြိမ်သာ ဖြတ်သန်းပြီး မိုးတိမ်များ ပိတ်ဆို့တတ်သဖြင့် လက်ရှိအချိန် မဟုတ်ပါ။"
-         data-en="Satellite passes come every 8-16 days and cloud blocks many of them, so these are recent composites, not the current moment.">
-         ဂြိုဟ်တုပုံများ — လက်ရှိအချိန် မဟုတ်ပါ။</p>
-      <label class="check">
-        <input type="checkbox" id="lstToggle">
-        <span data-my="မြေမျက်နှာပြင် အပူချိန် (Landsat)" data-en="Surface temperature (Landsat)">မြေမျက်နှာပြင် အပူချိန် (Landsat)</span>
-      </label>
-      <label class="check">
-        <input type="checkbox" id="ndviToggle">
-        <span data-my="သစ်ပင်ဖုံးလွှမ်းမှု (Sentinel-2)" data-en="Vegetation cover (Sentinel-2)">သစ်ပင်ဖုံးလွှမ်းမှု (Sentinel-2)</span>
-      </label>
-      <p class="formnote" id="satNote"></p>
-    </div>
+        <p class="reading"><span id="temp">--</span><span class="unit">°C</span></p>
+        <p class="verdict" id="verdict">…</p>
+        <p class="advice" id="advice"></p>
 
-    <button class="ghost" id="zoomOut" type="button"
-            data-my="ရန်ကုန်တိုင်းအားလုံး ပြရန်" data-en="Show the whole region">
-      ရန်ကုန်တိုင်းအားလုံး ပြရန်</button>
-  </section>
-
-  <!-- 48 hours -->
-  <section class="panel">
-    <h2 data-my="နောက် ၄၈ နာရီ" data-en="Next 48 hours">နောက် ၄၈ နာရီ</h2>
-    <p class="note" id="peakNote"></p>
-    <svg class="spark" id="spark" viewBox="0 0 320 96" preserveAspectRatio="none"
-         role="img" aria-label="Temperature forecast"></svg>
-    <div class="spark-axis" id="sparkAxis"></div>
-  </section>
-
-  <!-- comparison -->
-  <section class="panel">
-    <h2 data-my="မြို့နယ် နှစ်ခု နှိုင်းယှဉ်ရန်" data-en="Compare two townships">မြို့နယ် နှစ်ခု နှိုင်းယှဉ်ရန်</h2>
-    <div class="two">
-      <select id="cmpA" aria-label="First township"></select>
-      <select id="cmpB" aria-label="Second township"></select>
-    </div>
-    <div class="cmp" id="cmpResult"></div>
-  </section>
-
-  <!-- greening -->
-  <section class="panel">
-    <h2 data-my="သစ်ပင်စိုက်ခြင်း အကျိုးသက်ရောက်မှု" data-en="Effect of planting trees">သစ်ပင်စိုက်ခြင်း အကျိုးသက်ရောက်မှု</h2>
-    <label class="slider">
-      <span data-my="သစ်ပင်ဖုံးလွှမ်းမှု တိုးမည်" data-en="Extra canopy cover">သစ်ပင်ဖုံးလွှမ်းမှု တိုးမည်</span>
-      <output id="canopyOut">20%</output>
-      <input type="range" id="canopy" min="5" max="50" step="5" value="20">
-    </label>
-    <div class="cmp" id="greenResult"></div>
-    <p class="note" data-my="ဤသည်မှာ ခန့်မှန်းချက်သာဖြစ်ပြီး တိကျသော ရာသီဥတုပုံစံ မဟုတ်ပါ။ လေ့လာမှုများအရ သစ်ပင် ၁ ရာခိုင်နှုန်းလျှင် ၀.၀၂ မှ ၀.၁၅ ဒီဂရီအထိ ကွာပါသည်။"
-       data-en="A linear estimate, not a microclimate model. Published cooling per percentage point of canopy ranges from 0.02 to 0.15 °C.">
-       ဤသည်မှာ ခန့်မှန်းချက်သာဖြစ်ပြီး တိကျသော ရာသီဥတုပုံစံ မဟုတ်ပါ။</p>
-  </section>
-
-  <!-- climate history -->
-  <section class="panel">
-    <h2 data-my="ရန်ကုန်၏ ရာသီဥတု မှတ်တမ်း" data-en="Yangon's climate record">ရန်ကုန်၏ ရာသီဥတု မှတ်တမ်း</h2>
-    <p class="note" id="historyNote"></p>
-    <svg class="spark" id="historySpark" viewBox="0 0 320 96" preserveAspectRatio="none"
-         role="img" aria-label="Annual mean temperature"></svg>
-    <div class="spark-axis" id="historyAxis"></div>
-  </section>
-
-  <!-- assistant -->
-  <section class="panel">
-    <div class="robot-box">
-      <div class="robot-container" aria-hidden="true">
-        <div class="robot-head"></div>
-        <div class="robot-body"></div>
-        <div class="robot-arm-left"></div>
-        <div class="robot-arm-right"></div>
-        <div class="robot-leg-left"></div>
-        <div class="robot-leg-right"></div>
+        <dl class="chips">
+          <div><dt data-my="ခံစားရသော" data-en="Feels like">ခံစားရသော</dt><dd id="feels">--</dd></div>
+          <div><dt data-my="လေထုအရည်အသွေး" data-en="Air quality">လေထုအရည်အသွေး</dt><dd id="aqi">--</dd></div>
+          <div><dt data-my="မြို့ပျမ်းမျှနှင့်" data-en="vs city">မြို့ပျမ်းမျှနှင့်</dt><dd id="anomaly">--</dd></div>
+        </dl>
       </div>
-      <div>
-        <h2 data-my="AI အကူအညီ" data-en="AI Eco Assistant">AI အကူအညီ</h2>
-        <p class="note" data-my="အပူ၊ လေထုအရည်အသွေး၊ ဤ app အကြောင်း လွတ်လပ်စွာ မေးနိုင်ပါသည်။"
-           data-en="Ask any climate or app questions freely.">
-           အပူ၊ လေထုအရည်အသွေး၊ ဤ app အကြောင်း လွတ်လပ်စွာ မေးနိုင်ပါသည်။</p>
+
+      <div class="panel">
+        <h2 data-my="မြို့တစ်ခုလုံး" data-en="The whole city">မြို့တစ်ခုလုံး</h2>
+        <p class="note" data-my="မြို့နယ် ၄၄ ခု — အပူဆုံးမှ အအေးဆုံးသို့။ တစ်ခုချင်း နှိပ်ကြည့်ပါ။"
+           data-en="All 44 townships, hottest to coolest. Tap any bar.">
+           မြို့နယ် ၄၄ ခု — အပူဆုံးမှ အအေးဆုံးသို့။ တစ်ခုချင်း နှိပ်ကြည့်ပါ။</p>
+        <div class="ribbon" id="ribbon" role="list"></div>
+        <div class="ribbon-ends">
+          <span id="ribbonHot"></span>
+          <span id="ribbonCool"></span>
+        </div>
       </div>
+
+      <div class="panel">
+        <h2 data-my="နောက် ၄၈ နာရီ" data-en="Next 48 hours">နောက် ၄၈ နာရီ</h2>
+        <p class="note" id="peakNote"></p>
+        <div class="chart-wrap">
+          <div class="y-axis" id="sparkY"></div>
+          <svg class="spark" id="spark" viewBox="0 0 320 110"
+               role="img" aria-label="Temperature forecast"></svg>
+        </div>
+        <div class="spark-axis" id="sparkAxis"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-map">
+      <div class="panel">
+        <h2 data-my="မြေပုံ" data-en="Map">မြေပုံ</h2>
+        <p class="note" data-my="မြို့နယ်တစ်ခုချင်း အပူချိန်အလိုက် အရောင်ခြယ်ထားသည်။ နှိပ်ပြီး ရွေးနိုင်သည်။"
+           data-en="Each township is shaded by its temperature. Tap one to select it.">
+           မြို့နယ်တစ်ခုချင်း အပူချိန်အလိုက် အရောင်ခြယ်ထားသည်။</p>
+        <div id="map" role="application" aria-label="Township temperature map"></div>
+
+        <div class="legend">
+          <span><i class="pin hot">🔥</i>
+            <b data-my="အဆင့် ၄–၅" data-en="Level 4–5">အဆင့် ၄–၅</b></span>
+          <span><i class="pin mid">❗</i>
+            <b data-my="အဆင့် ၂–၃" data-en="Level 2–3">အဆင့် ၂–၃</b></span>
+          <span><i class="pin cool">🍃</i>
+            <b data-my="အဆင့် ၁" data-en="Level 1">အဆင့် ၁</b></span>
+        </div>
+
+        <div class="scale" id="mapScale"></div>
+
+        <div class="sat" id="satControls" hidden>
+          <p class="note" data-my="ဂြိုဟ်တုပုံများ — ၈ မှ ၁၆ ရက်တစ်ကြိမ်သာ ဖြတ်သန်းသဖြင့် လက်ရှိအချိန် မဟုတ်ပါ။"
+             data-en="Satellite passes come every 8-16 days, so these are recent composites, not the current moment.">
+             ဂြိုဟ်တုပုံများ — လက်ရှိအချိန် မဟုတ်ပါ။</p>
+          <label class="check">
+            <input type="checkbox" id="lstToggle">
+            <span data-my="မြေမျက်နှာပြင် အပူချိန်" data-en="Surface temperature">မြေမျက်နှာပြင် အပူချိန်</span>
+          </label>
+          <label class="check">
+            <input type="checkbox" id="ndviToggle">
+            <span data-my="သစ်ပင်ဖုံးလွှမ်းမှု" data-en="Vegetation cover">သစ်ပင်ဖုံးလွှမ်းမှု</span>
+          </label>
+          <p class="formnote" id="satNote"></p>
+        </div>
+
+        <button class="ghost" id="zoomOut" type="button"
+                data-my="ရန်ကုန်တိုင်းအားလုံး ပြရန်" data-en="Show the whole region">
+          ရန်ကုန်တိုင်းအားလုံး ပြရန်</button>
+      </div>
+    </section>
+
+    <section class="view" id="view-air">
+      <div class="panel">
+        <h2 data-my="လေထုအရည်အသွေး" data-en="Air quality">လေထုအရည်အသွေး</h2>
+        <p class="note" data-my="PM2.5 သည် အဆုတ်ထဲအထိ ဝင်ရောက်နိုင်သော အမှုန်အမွှားများဖြစ်သည်။"
+           data-en="PM2.5 is fine particulate small enough to reach deep into the lungs.">
+           PM2.5 သည် အဆုတ်ထဲအထိ ဝင်ရောက်နိုင်သော အမှုန်အမွှားများဖြစ်သည်။</p>
+
+        <div class="air-hero" id="airHero"></div>
+        <div class="who-bar" id="whoBar"></div>
+        <p class="note" id="whoNote"></p>
+
+        <h3 class="sub" data-my="မြို့နယ်အလိုက် PM2.5" data-en="PM2.5 by township">မြို့နယ်အလိုက် PM2.5</h3>
+        <div class="rank" id="airRank"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-compare">
+      <div class="panel">
+        <h2 data-my="မြို့နယ် နှစ်ခု နှိုင်းယှဉ်ရန်" data-en="Compare two townships">မြို့နယ် နှစ်ခု နှိုင်းယှဉ်ရန်</h2>
+        <div class="two">
+          <select id="cmpA" aria-label="First township"></select>
+          <select id="cmpB" aria-label="Second township"></select>
+        </div>
+        <div class="cmp" id="cmpResult"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-trees">
+      <div class="panel">
+        <h2 data-my="သစ်ပင်စိုက်ခြင်း အကျိုးသက်ရောက်မှု" data-en="Effect of planting trees">သစ်ပင်စိုက်ခြင်း အကျိုးသက်ရောက်မှု</h2>
+
+        <div class="scene" id="treeScene" aria-hidden="true"></div>
+
+        <label class="slider">
+          <span data-my="သစ်ပင်ဖုံးလွှမ်းမှု တိုးမည်" data-en="Extra canopy cover">သစ်ပင်ဖုံးလွှမ်းမှု တိုးမည်</span>
+          <output id="canopyOut">20%</output>
+          <input type="range" id="canopy" min="5" max="50" step="5" value="20">
+        </label>
+        <div class="cmp" id="greenResult"></div>
+        <p class="note"
+           data-my="ဤသည်မှာ ခန့်မှန်းချက်သာဖြစ်ပြီး တိကျသော ရာသီဥတုပုံစံ မဟုတ်ပါ။ လေ့လာမှုများအရ သစ်ပင် ၁ ရာခိုင်နှုန်းလျှင် ၀.၀၂ မှ ၀.၁၅ ဒီဂရီအထိ ကွာပါသည်။"
+           data-en="A linear estimate, not a microclimate model. Published cooling per percentage point of canopy ranges from 0.02 to 0.15 °C.">
+           ဤသည်မှာ ခန့်မှန်းချက်သာဖြစ်ပြီး တိကျသော ရာသီဥတုပုံစံ မဟုတ်ပါ။</p>
+      </div>
+    </section>
+
+    <section class="view" id="view-history">
+      <div class="panel">
+        <h2 data-my="ရန်ကုန်၏ ရာသီဥတု မှတ်တမ်း" data-en="Yangon's climate record">ရန်ကုန်၏ ရာသီဥတု မှတ်တမ်း</h2>
+        <p class="note" id="historyNote"></p>
+        <div class="chart-wrap tall">
+          <div class="y-axis" id="historyY"></div>
+          <svg class="spark" id="historySpark" viewBox="0 0 320 140"
+               role="img" aria-label="Annual mean temperature"></svg>
+        </div>
+        <div class="spark-axis" id="historyAxis"></div>
+        <p class="axis-title" data-my="နှစ်" data-en="Year">နှစ်</p>
+      </div>
+    </section>
+
+    <section class="view" id="view-alerts">
+      <div class="panel">
+        <h2 data-my="အပူသတိပေးချက် ရယူရန်" data-en="Get heat alerts">အပူသတိပေးချက် ရယူရန်</h2>
+
+        <div class="notice" id="alertStatus"></div>
+
+        <form id="alertForm" class="stack">
+          <input type="email" id="alertEmail" required placeholder="you@example.com"
+                 autocomplete="email">
+          <label class="slider">
+            <span data-my="အပူချိန်ကန့်သတ်ချက်" data-en="Alert me above">အပူချိန်ကန့်သတ်ချက်</span>
+            <output id="thresholdOut">36 °C</output>
+            <input type="range" id="threshold" min="30" max="45" step="0.5" value="36">
+          </label>
+          <button type="submit" data-my="သတိပေးချက် ဖွင့်မည်" data-en="Turn on alerts">သတိပေးချက် ဖွင့်မည်</button>
+          <p class="formnote" id="alertNote" role="status"></p>
+        </form>
+
+        <h3 class="sub" data-my="ဤစက်တွင် သတိပေးရန်" data-en="Notify me on this device">ဤစက်တွင် သတိပေးရန်</h3>
+        <p class="note" data-my="app ဖွင့်ထားစဉ် သင့်မြို့နယ် ကန့်သတ်ချက်ကျော်လျှင် အသိပေးပါမည်။"
+           data-en="While the app is open, we notify you if your township passes the limit.">
+           app ဖွင့်ထားစဉ် သင့်မြို့နယ် ကန့်သတ်ချက်ကျော်လျှင် အသိပေးပါမည်။</p>
+        <button class="ghost" id="notifyBtn" type="button"
+                data-my="ဤစက်တွင် အသိပေးချက် ဖွင့်မည်" data-en="Enable device notifications">
+          ဤစက်တွင် အသိပေးချက် ဖွင့်မည်</button>
+        <p class="formnote" id="notifyNote"></p>
+      </div>
+    </section>
+
+    <section class="view" id="view-report">
+      <div class="panel">
+        <h2 data-my="သင့်ဒေသ အခြေအနေ ပြောပြပါ" data-en="Report what it feels like">သင့်ဒေသ အခြေအနေ ပြောပြပါ</h2>
+        <form id="reportForm" class="stack">
+          <input type="text" id="reportName" required maxlength="80"
+                 placeholder="နာမည် / Name" autocomplete="name">
+          <label class="slider">
+            <span data-my="ခံစားရသော အပူပြင်းအား" data-en="How hot does it feel">ခံစားရသော အပူပြင်းအား</span>
+            <output id="intensityOut">7 / 10</output>
+            <input type="range" id="intensity" min="1" max="10" step="1" value="7">
+          </label>
+          <textarea id="reportNotes" rows="3" maxlength="1000"
+                    placeholder="မှတ်ချက် — ဥပမာ လမ်းဘေးမှာ အရိပ်မရှိပါ / Notes"></textarea>
+          <button type="submit" data-my="ပို့မည်" data-en="Send report">ပို့မည်</button>
+          <p class="formnote" id="reportNote" role="status"></p>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h2 data-my="အစီရင်ခံစာ ရယူရန်" data-en="Download a report">အစီရင်ခံစာ ရယူရန်</h2>
+        <div class="two">
+          <button class="ghost" id="pdfBtn" type="button"
+                  data-my="PDF ရယူမည်" data-en="Download PDF">PDF ရယူမည်</button>
+          <button class="ghost" id="printBtn" type="button"
+                  data-my="ပုံနှိပ်မည်" data-en="Print this page">ပုံနှိပ်မည်</button>
+        </div>
+        <p class="formnote" id="pdfNote"></p>
+      </div>
+    </section>
+
+    <footer>
+      <p class="sources">
+        <span data-my="ရင်းမြစ်" data-en="Sources">ရင်းမြစ်</span>:
+        Open-Meteo · geoBoundaries (CC-BY 4.0) · Landsat / Sentinel-2
+      </p>
+      <p class="sources" data-my="အပူချိန်များကို နာရီတိုင်း အသစ်ဆွဲသည်။ ဆေးဘက်ဆိုင်ရာ အကြံဉာဏ် မဟုတ်ပါ။"
+         data-en="Readings refresh hourly. This is not medical advice.">
+         အပူချိန်များကို နာရီတိုင်း အသစ်ဆွဲသည်။ ဆေးဘက်ဆိုင်ရာ အကြံဉာဏ် မဟုတ်ပါ။</p>
+      <p class="sources">
+        <a href="privacy.html" data-my="ကိုယ်ရေးအချက်အလက် မူဝါဒ" data-en="Privacy policy">ကိုယ်ရေးအချက်အလက် မူဝါဒ</a>
+      </p>
+    </footer>
+
+  </main>
+</div>
+
+<button class="fab" id="fab" type="button" aria-label="Ask the assistant">
+  <span class="fab-robot" aria-hidden="true">
+    <span class="robot-head"></span>
+    <span class="robot-body"></span>
+    <span class="robot-arm-left"></span>
+    <span class="robot-arm-right"></span>
+  </span>
+</button>
+
+<div class="sheet-wrap" id="chatSheet" hidden>
+  <div class="sheet-scrim" id="chatScrim"></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Assistant">
+    <div class="sheet-head">
+      <div class="robot-box">
+        <div class="robot-container" aria-hidden="true">
+          <div class="robot-head"></div>
+          <div class="robot-body"></div>
+          <div class="robot-arm-left"></div>
+          <div class="robot-arm-right"></div>
+          <div class="robot-leg-left"></div>
+          <div class="robot-leg-right"></div>
+        </div>
+        <div>
+          <h2 data-my="AI အကူအညီ" data-en="AI Eco Assistant">AI အကူအညီ</h2>
+          <p class="note" data-my="လွတ်လပ်စွာ မေးနိုင်ပါသည်။" data-en="Ask anything.">လွတ်လပ်စွာ မေးနိုင်ပါသည်။</p>
+        </div>
+      </div>
+      <button class="icon-btn" id="chatClose" type="button" aria-label="Close">✕</button>
     </div>
+
     <div class="chat" id="chatLog"></div>
+
     <form id="chatForm" class="chat-form">
       <input type="text" id="chatInput" maxlength="600"
              placeholder="မေးခွန်း ရိုက်ပါ… / Type a question…" autocomplete="off">
       <button type="button" id="micBtn" class="mic" aria-label="Ask by voice">🎙</button>
       <button type="submit" aria-label="Send">↑</button>
     </form>
-  </section>
-
-  <!-- alerts -->
-  <section class="panel">
-    <h2 data-my="အပူသတိပေးချက် ရယူရန်" data-en="Get heat alerts">အပူသတိပေးချက် ရယူရန်</h2>
-    <p class="note" data-my="သင့်မြို့နယ် ပူလာလျှင် အီးမေးလ်ပို့ပေးမည်။"
-       data-en="We email you when your township passes your limit.">
-       သင့်မြို့နယ် ပူလာလျှင် အီးမေးလ်ပို့ပေးမည်။</p>
-    <form id="alertForm" class="stack">
-      <input type="email" id="alertEmail" required placeholder="you@example.com"
-             autocomplete="email">
-      <label class="slider">
-        <span data-my="အပူချိန်ကန့်သတ်ချက်" data-en="Alert me above">အပူချိန်ကန့်သတ်ချက်</span>
-        <output id="thresholdOut">36 °C</output>
-        <input type="range" id="threshold" min="30" max="45" step="0.5" value="36">
-      </label>
-      <button type="submit" data-my="သတိပေးချက် ဖွင့်မည်" data-en="Turn on alerts">သတိပေးချက် ဖွင့်မည်</button>
-      <p class="formnote" id="alertNote" role="status"></p>
-    </form>
-  </section>
-
-  <!-- citizen reports -->
-  <section class="panel">
-    <h2 data-my="သင့်ဒေသ အခြေအနေ ပြောပြပါ" data-en="Report what it feels like">သင့်ဒေသ အခြေအနေ ပြောပြပါ</h2>
-    <form id="reportForm" class="stack">
-      <input type="text" id="reportName" required maxlength="80"
-             placeholder="နာမည် / Name" autocomplete="name">
-      <label class="slider">
-        <span data-my="ခံစားရသော အပူပြင်းအား" data-en="How hot does it feel">ခံစားရသော အပူပြင်းအား</span>
-        <output id="intensityOut">7 / 10</output>
-        <input type="range" id="intensity" min="1" max="10" step="1" value="7">
-      </label>
-      <textarea id="reportNotes" rows="3" maxlength="1000"
-                placeholder="မှတ်ချက် — ဥပမာ လမ်းဘေးမှာ အရိပ်မရှိပါ / Notes"></textarea>
-      <button type="submit" data-my="ပို့မည်" data-en="Send report">ပို့မည်</button>
-      <p class="formnote" id="reportNote" role="status"></p>
-    </form>
-  </section>
-
-  <!-- report -->
-  <section class="panel">
-    <h2 data-my="အစီရင်ခံစာ ရယူရန်" data-en="Download a report">အစီရင်ခံစာ ရယူရန်</h2>
-    <p class="note" data-my="မြို့နယ် ၄၄ ခုလုံး၏ လက်ရှိအခြေအနေကို PDF အဖြစ် ရယူပါ။"
-       data-en="Current readings for all 44 townships as a PDF.">
-       မြို့နယ် ၄၄ ခုလုံး၏ လက်ရှိအခြေအနေကို PDF အဖြစ် ရယူပါ။</p>
-    <div class="two">
-      <button class="ghost" id="pdfBtn" type="button"
-              data-my="PDF ရယူမည်" data-en="Download PDF">PDF ရယူမည်</button>
-      <button class="ghost" id="printBtn" type="button"
-              data-my="ဤစာမျက်နှာကို ပုံနှိပ်မည်" data-en="Print this page">ဤစာမျက်နှာကို ပုံနှိပ်မည်</button>
-    </div>
-    <p class="formnote" id="pdfNote"></p>
-  </section>
-
-  <footer>
-    <p class="sources">
-      <span data-my="ရင်းမြစ်" data-en="Sources">ရင်းမြစ်</span>:
-      Open-Meteo · geoBoundaries (CC-BY 4.0)
-    </p>
-    <p class="sources" data-my="အပူချိန်များကို နာရီတိုင်း အသစ်ဆွဲသည်။ ဆေးဘက်ဆိုင်ရာ အကြံဉာဏ် မဟုတ်ပါ။"
-       data-en="Readings refresh hourly. This is not medical advice.">
-       အပူချိန်များကို နာရီတိုင်း အသစ်ဆွဲသည်။ ဆေးဘက်ဆိုင်ရာ အကြံဉာဏ် မဟုတ်ပါ။</p>
-  </footer>
-
-</main>
+  </div>
+</div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 

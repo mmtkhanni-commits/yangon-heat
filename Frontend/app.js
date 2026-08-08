@@ -21,6 +21,7 @@ const STORE = 'yangon-heat';
 const state = {
   lang: localStorage.getItem(`${STORE}:lang`) || 'my',
   township: localStorage.getItem(`${STORE}:township`) || null,
+  view: 'today',
   live: null,
 };
 
@@ -49,6 +50,9 @@ function applyLanguage() {
     if (text) node.textContent = text;
   });
   $('langToggle').textContent = state.lang === 'my' ? 'EN' : 'မြန်မာ';
+
+  const bar = document.getElementById('installBar');
+  if (bar && !bar.hidden) showInstallBar(bar.dataset.mode || 'android');
   if (state.live) render();
 }
 
@@ -256,6 +260,146 @@ function matchRow(feature, byName) {
   return Object.values(byName).find((r) => squash(r.name.toLowerCase()) === target) || null;
 }
 
+/* ----------------------------------------------------------------- install */
+
+// Chrome fires beforeinstallprompt and lets us trigger the real dialog.
+// Safari fires nothing at all, so iOS gets written instructions instead.
+let deferredInstall = null;
+
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+}
+
+function isIOS() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function showInstallBar(mode) {
+  if (isStandalone()) return;                                  // already installed
+  if (localStorage.getItem(`${STORE}:install-dismissed`)) return;
+
+  const bar = $('installBar');
+  $('installTitle').textContent = say('ဖုန်းမှာ တင်ထားပါ',
+                                      'Add it to your home screen');
+  $('installBody').textContent = mode === 'ios'
+    ? say('Safari ရဲ့ မျှဝေခလုတ်မှတစ်ဆင့် တင်နိုင်ပါသည်။',
+          'Install it from the Safari share menu.')
+    : say('App လိုပဲ ပွင့်ပြီး အင်တာနက်မရှိလည်း နောက်ဆုံးအချက်အလက် ကြည့်နိုင်သည်။',
+          'Opens like an app, and the last reading stays available offline.');
+  $('installGo').textContent = mode === 'ios'
+    ? say('ဘယ်လိုလုပ်ရမလဲ', 'How')
+    : say('တင်မည်', 'Install');
+
+  bar.dataset.mode = mode;
+  bar.hidden = false;
+}
+
+function iosInstructions() {
+  const log = $('chatLog');
+  $('chatSheet').hidden = false;
+  log.innerHTML = '';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'msg bot';
+  wrap.innerHTML = `
+    <b>${say('ဖုန်းမှာ တင်နည်း', 'Add to your home screen')}</b>
+    <ul class="ios-steps">
+      <li><span class="num">1</span>
+        <span>${say('အောက်ခြေက', 'Tap the share button')}
+          <span class="glyph">&#x2934;</span>
+          ${say('မျှဝေခလုတ်ကို နှိပ်ပါ', 'at the bottom of Safari')}</span></li>
+      <li><span class="num">2</span>
+        <span>${say('“Add to Home Screen” ကို ရွေးပါ',
+                    'Choose "Add to Home Screen"')}</span></li>
+      <li><span class="num">3</span>
+        <span>${say('“Add” နှိပ်ပါ — ဖုန်းမျက်နှာပြင်တွင် icon ပေါ်လာပါမည်',
+                    'Tap "Add" — the icon appears on your home screen')}</span></li>
+    </ul>
+    <p style="margin:10px 0 0;font-size:12.5px;color:var(--muted)">
+      ${say('Chrome တွင် မရပါ — Safari ဖြင့်သာ ဖွင့်ပါ။',
+            'This only works in Safari, not Chrome on iPhone.')}
+    </p>`;
+  log.append(wrap);
+}
+
+async function runInstall() {
+  const bar = $('installBar');
+
+  if (bar.dataset.mode === 'ios') {
+    iosInstructions();
+    return;
+  }
+
+  if (!deferredInstall) {
+    toast(say('ဤ browser တွင် တိုက်ရိုက် တင်၍ မရပါ — menu မှ “Add to Home screen” ကို သုံးပါ။',
+              'Use the browser menu, then "Add to Home screen".'));
+    return;
+  }
+
+  deferredInstall.prompt();
+  const { outcome } = await deferredInstall.userChoice;
+  deferredInstall = null;
+  bar.hidden = true;
+
+  if (outcome === 'accepted') {
+    toast(say('တင်ပြီးပါပြီ 🎉', 'Installed 🎉'));
+  }
+}
+
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  deferredInstall = event;
+  showInstallBar('android');
+});
+
+window.addEventListener('appinstalled', () => {
+  $('installBar').hidden = true;
+  toast(say('ဖုန်းမျက်နှာပြင်တွင် ထည့်ပြီးပါပြီ။', 'Added to your home screen.'));
+});
+
+/* ------------------------------------------------------------------- views */
+
+function showView(name) {
+  document.querySelectorAll('.view').forEach((view) => {
+    view.classList.toggle('is-active', view.id === `view-${name}`);
+  });
+  document.querySelectorAll('.nav-item').forEach((item) => {
+    item.classList.toggle('is-active', item.dataset.view === name);
+  });
+
+  state.view = name;
+  const url = new URL(window.location);
+  url.searchParams.set('view', name);
+  history.replaceState({}, '', url);
+
+  closeDrawer();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+
+  // Leaflet measures its container on creation; a hidden one measures as zero
+  if (name === 'map' && mapState.map) {
+    setTimeout(() => mapState.map.invalidateSize(), 60);
+  }
+  if (name === 'map') renderMap();
+  if (name === 'air') renderAir();
+  if (name === 'trees') renderGreening();
+  if (name === 'history') renderHistory();
+  if (name === 'compare') fillCompare();
+}
+
+function openDrawer() {
+  $('sidenav').classList.add('is-open');
+  $('scrim').hidden = false;
+  $('burger').setAttribute('aria-expanded', 'true');
+}
+
+function closeDrawer() {
+  $('sidenav').classList.remove('is-open');
+  $('scrim').hidden = true;
+  $('burger').setAttribute('aria-expanded', 'false');
+}
+
 /* ------------------------------------------------------------------ toasts */
 
 let toastTimer;
@@ -395,30 +539,51 @@ function renderHero(detail) {
   );
 }
 
+function niceTicks(lo, hi, count = 4) {
+  // round the axis to values a reader recognises rather than raw data extremes
+  const raw = (hi - lo) / count;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].find((m) => magnitude * m >= raw) * magnitude;
+  const start = Math.floor(lo / step) * step;
+  const ticks = [];
+  for (let v = start; v <= hi + step / 2; v += step) ticks.push(Number(v.toFixed(2)));
+  return ticks;
+}
+
 function renderSpark(hours) {
   const svg = $('spark');
   if (!hours.length) { svg.innerHTML = ''; return; }
 
   const W = 320;
-  const H = 96;
+  const H = 110;
   const temps = hours.map((h) => h.temp);
   const feels = hours.map((h) => h.feels_like ?? h.temp);
-  const lo = Math.min(...temps, ...feels) - 0.6;
-  const hi = Math.max(...temps, ...feels) + 0.6;
+  const ticks = niceTicks(Math.min(...temps, ...feels) - 0.5,
+                          Math.max(...temps, ...feels) + 0.5);
+  const lo = ticks[0];
+  const hi = ticks[ticks.length - 1];
+  const PAD = 14;   // room for the bottom axis line
   const x = (i) => (i / (hours.length - 1)) * W;
-  const y = (v) => H - ((v - lo) / (hi - lo)) * (H - 10) - 5;
+  const y = (v) => (H - PAD) - ((v - lo) / (hi - lo)) * (H - PAD - 6);
 
   const path = (values) =>
     values.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
 
   const peakIdx = temps.indexOf(Math.max(...temps));
+  const grid = ticks.map((t) =>
+    `<line class="grid" x1="0" y1="${y(t).toFixed(1)}" x2="${W}" y2="${y(t).toFixed(1)}"/>`).join('');
 
   svg.innerHTML = `
-    <path class="band" d="${path(temps)}L${W},${H}L0,${H}Z"/>
+    ${grid}
+    <path class="band" d="${path(temps)}L${W},${(H - PAD)}L0,${(H - PAD)}Z"/>
     <path class="feels" d="${path(feels)}"/>
     <path class="line" d="${path(temps)}"/>
     <circle class="peak" cx="${x(peakIdx).toFixed(1)}" cy="${y(temps[peakIdx]).toFixed(1)}" r="3.5"/>
+    <line class="axis" x1="0" y1="${H - PAD}" x2="${W}" y2="${H - PAD}"/>
   `;
+
+  $('sparkY').innerHTML = [...ticks].reverse()
+    .map((t) => `<span>${t}°</span>`).join('');
 
   const fmt = (stamp) => stamp.slice(11, 16);
   $('sparkAxis').innerHTML =
@@ -481,6 +646,7 @@ function selectTownship(name) {
   $('townshipPick').value = name;
   renderRibbon();
   renderGreening();
+  if (state.view === 'air') renderAir();
   loadDetail();
 }
 
@@ -742,13 +908,143 @@ function renderCompare() {
     `<p class="verdict-line">${line}</p>`;
 }
 
+/* --------------------------------------------------------------- air quality */
+
+// WHO 2021 24-hour guideline is 15 ug/m3; the interim targets step up from there
+const WHO_STEPS = [
+  { limit: 15, colour: '#4E9E7E', label: 'WHO' },
+  { limit: 25, colour: '#8FBF6A', label: 'IT-4' },
+  { limit: 37.5, colour: '#E3A857', label: 'IT-3' },
+  { limit: 50, colour: '#C9502F', label: 'IT-2' },
+  { limit: 75, colour: '#A31E1E', label: 'IT-1' },
+];
+
+function pm25Colour(value) {
+  if (value == null) return 'var(--muted)';
+  return (WHO_STEPS.find((s) => value <= s.limit) || WHO_STEPS[WHO_STEPS.length - 1]).colour;
+}
+
+function renderAir() {
+  const rows = state.live.townships;
+  const mine = rows.find((r) => r.name === state.township);
+  const withPm = rows.filter((r) => r.pm25 != null);
+
+  if (!withPm.length) {
+    $('airHero').innerHTML =
+      `<p class="note">${say('PM2.5 အချက်အလက် မရနိုင်သေးပါ။',
+                            'No PM2.5 readings available right now.')}</p>`;
+    $('whoBar').innerHTML = '';
+    $('airRank').innerHTML = '';
+    return;
+  }
+
+  const cityPm = withPm.reduce((sum, r) => sum + r.pm25, 0) / withPm.length;
+  const worst = withPm.reduce((a, b) => (a.pm25 >= b.pm25 ? a : b));
+  const minePm = mine && mine.pm25 != null ? mine.pm25 : null;
+
+  const cell = (title, big, sub, colour) => `
+    <div class="cell" style="border-left-color:${colour}">
+      <h3>${title}</h3>
+      <div class="big" style="color:${colour}">${big}</div>
+      <div class="sub">${sub}</div>
+    </div>`;
+
+  $('airHero').innerHTML =
+    cell(say(`${label(mine)} · PM2.5`, `${label(mine)} · PM2.5`),
+         minePm != null ? minePm : '—',
+         minePm != null
+           ? say(`WHO လမ်းညွှန်ချက်၏ ${(minePm / 15).toFixed(1)} ဆ`,
+                 `${(minePm / 15).toFixed(1)}× the WHO guideline`)
+           : say('တိုင်းတာချက် မရှိ', 'no reading'),
+         pm25Colour(minePm)) +
+    cell(say('မြို့ပျမ်းမျှ', 'City average'), cityPm.toFixed(1),
+         say('µg/m³', 'µg/m³'), pm25Colour(cityPm)) +
+    cell(say('အဆိုးဆုံး', 'Worst'), worst.pm25,
+         label(worst), pm25Colour(worst.pm25)) +
+    cell(say('US AQI', 'US AQI'), mine && mine.aqi ? mine.aqi : '—',
+         mine ? aqiWords(mine.aqi_band) : '', 'var(--river)');
+
+  // the WHO scale, with a marker showing where the reader's township sits
+  const shown = minePm != null ? minePm : cityPm;
+  const position = Math.min(shown / 75, 1) * 100;
+  $('whoBar').innerHTML =
+    WHO_STEPS.map((s) => `<span class="seg" style="background:${s.colour}">${s.label}</span>`).join('') +
+    `<span class="marker" style="left:${position.toFixed(1)}%"></span>`;
+
+  $('whoNote').textContent = say(
+    `ကမ္ဘာ့ကျန်းမာရေးအဖွဲ့၏ ၂၄ နာရီ လမ်းညွှန်ချက်မှာ ၁၅ µg/m³ ဖြစ်သည်။ အမှတ်အသားက ${label(mine)} ရှိရာနေရာကို ပြသည်။`,
+    `The WHO 24-hour guideline is 15 µg/m³. The marker shows where ${label(mine)} sits.`);
+
+  const top = [...withPm].sort((a, b) => b.pm25 - a.pm25);
+  const max = top[0].pm25;
+  $('airRank').innerHTML = top.map((r) => `
+    <div class="row${r.name === state.township ? ' is-mine' : ''}">
+      <button type="button" data-goto="${r.name}">
+        <span class="name">${label(r)}</span>
+        <span class="bar" style="width:${Math.max((r.pm25 / max) * 100, 3)}%;
+              background:${pm25Colour(r.pm25)}"></span>
+      </button>
+      <span class="val">${r.pm25}</span>
+    </div>`).join('');
+
+  $('airRank').querySelectorAll('[data-goto]').forEach((button) => {
+    button.addEventListener('click', () => {
+      selectTownship(button.dataset.goto);
+      renderAir();
+    });
+  });
+}
+
+function aqiWords(band) {
+  const words = {
+    good: [', ကောင်း', 'Good'], moderate: ['အလယ်အလတ်', 'Moderate'],
+    sensitive: ['ထိခိုက်လွယ်သူများ သတိပြုရန်', 'Unhealthy for sensitive groups'],
+    unhealthy: ['ကျန်းမာရေးထိခိုက်နိုင်', 'Unhealthy'],
+    unknown: ['တိုင်းတာချက် မရှိ', 'No reading'],
+  }[band] || ['', ''];
+  return say(words[0], words[1]);
+}
+
 /* ---------------------------------------------------------------- greening */
+
+function drawTreeScene(pct, drop, baseTemp) {
+  const scene = $('treeScene');
+  if (!scene) return;
+
+  // one tree per 5% of canopy, so the slider has something to move
+  const trees = Math.round(pct / 5);
+  const cooling = Math.min(drop / 3, 1);        // 0..1 for the visual mood
+
+  let html = '<span class="sun" style="background:' +
+    (cooling > 0.5 ? '#E3A857' : '#F0B45E') + '"></span>';
+  html += `<span class="heat" style="opacity:${(1 - cooling * 0.75).toFixed(2)}"></span>`;
+  html += '<span class="ground"></span>';
+
+  // a low skyline so the trees read as being in a city
+  const blocks = [[8, 26, 34], [26, 20, 46], [64, 22, 30], [82, 24, 40]];
+  blocks.forEach(([left, width, height]) => {
+    html += `<span class="building" style="left:${left}%;width:${width}px;height:${height}px"></span>`;
+  });
+
+  for (let i = 0; i < trees; i += 1) {
+    const size = 20 + (i % 3) * 5;
+    const left = 6 + (i * 88) / Math.max(trees, 1) + (i % 2 ? 2 : -2);
+    html += `<span class="tree" style="left:${left.toFixed(1)}%;width:${size}px;
+             animation-delay:${(i * 0.06).toFixed(2)}s">
+               <span class="canopy"></span><span class="trunk"></span>
+             </span>`;
+  }
+
+  html += `<span class="drop">${baseTemp}° → ${(baseTemp - drop).toFixed(1)}°</span>`;
+  scene.innerHTML = html;
+}
 
 function renderGreening() {
   const row = state.live.townships.find((r) => r.name === state.township);
   if (!row) return;
   const pct = Number($('canopy').value);
   $('canopyOut').textContent = `${pct}%`;
+  drawTreeScene(pct, pct * 0.06, row.temp);
 
   // published cooling per percentage point of canopy spans a wide range, so
   // show the band rather than pretending to one number
@@ -789,21 +1085,36 @@ async function renderHistory() {
       `Annual mean moved ${sign}${change}°C between ${first.year} and ${last.year}. ${last.year} had ${last.days_above_38} days above 38°C.`);
 
     const values = done.map((y) => y.mean_temp);
-    const W = 320, H = 96;
-    const lo = Math.min(...values) - 0.3;
-    const hi = Math.max(...values) + 0.3;
+    const W = 320, H = 140, PAD = 16;
+    const ticks = niceTicks(Math.min(...values) - 0.2, Math.max(...values) + 0.2, 4);
+    const lo = ticks[0];
+    const hi = ticks[ticks.length - 1];
     const x = (i) => (i / (values.length - 1)) * W;
-    const y = (v) => H - ((v - lo) / (hi - lo)) * (H - 12) - 6;
+    const y = (v) => (H - PAD) - ((v - lo) / (hi - lo)) * (H - PAD - 8);
     const path = values.map((v, i) =>
       `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
 
-    $('historySpark').innerHTML = `
-      <path class="band" d="${path}L${W},${H}L0,${H}Z"/>
-      <path class="line" d="${path}"/>
-      <circle class="peak" cx="${x(values.length - 1)}" cy="${y(values[values.length - 1]).toFixed(1)}" r="3.5"/>`;
+    const grid = ticks.map((t) =>
+      `<line class="grid" x1="0" y1="${y(t).toFixed(1)}" x2="${W}" y2="${y(t).toFixed(1)}"/>`).join('');
 
-    $('historyAxis').innerHTML =
-      `<span>${first.year}</span><span>${done[Math.floor(done.length / 2)].year}</span><span>${last.year}</span>`;
+    const dots = values.map((v, i) =>
+      `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="2" fill="var(--thanaka)"/>`).join('');
+
+    $('historySpark').innerHTML = `
+      ${grid}
+      <path class="band" d="${path}L${W},${H - PAD}L0,${H - PAD}Z"/>
+      <path class="line" d="${path}"/>
+      ${dots}
+      <circle class="peak" cx="${x(values.length - 1)}" cy="${y(values[values.length - 1]).toFixed(1)}" r="4"/>
+      <line class="axis" x1="0" y1="${H - PAD}" x2="${W}" y2="${H - PAD}"/>`;
+
+    $('historyY').innerHTML = [...ticks].reverse()
+      .map((t) => `<span>${t}°</span>`).join('');
+
+    const every = Math.max(1, Math.round(done.length / 4));
+    $('historyAxis').innerHTML = done
+      .filter((_, i) => i % every === 0 || i === done.length - 1)
+      .map((yr) => `<span>${yr.year}</span>`).join('');
   } catch (_) {
     $('historyNote').textContent = say('မှတ်တမ်း မရနိုင်ပါ။', 'Climate record unavailable.');
   }
@@ -890,12 +1201,83 @@ async function sendChat(question) {
   }
 }
 
+/* ---------------------------------------------------------- notifications */
+
+const notes = [];
+
+function pushNotice(text) {
+  notes.unshift({ text, at: new Date() });
+  $('bellDot').hidden = false;
+
+  // a real background push needs a push service and a paid worker to run it;
+  // this fires only while the page is open, which is what it says on the button
+  if (window.Notification && Notification.permission === 'granted') {
+    try {
+      new Notification(say('ရန်ကုန် အပူအခြေအနေ', 'Yangon Heat'), {
+        body: text, icon: 'icon-192.png', tag: 'yangon-heat',
+      });
+    } catch (_) { /* some browsers block this outside a service worker */ }
+  }
+}
+
+function showNotices() {
+  $('bellDot').hidden = true;
+  if (!notes.length) {
+    toast(say('အသိပေးချက် မရှိသေးပါ။', 'No notifications yet.'));
+    return;
+  }
+  const list = notes.slice(0, 5)
+    .map((n) => `${n.at.toTimeString().slice(0, 5)} — ${n.text}`).join('\n');
+  alert(list);
+}
+
+async function enableNotifications() {
+  const note = $('notifyNote');
+  if (!window.Notification) {
+    note.className = 'formnote bad';
+    note.textContent = say('ဤ browser တွင် အသိပေးချက် မရနိုင်ပါ။',
+                           'This browser cannot show notifications.');
+    return;
+  }
+
+  const permission = await Notification.requestPermission();
+  note.className = permission === 'granted' ? 'formnote ok' : 'formnote bad';
+  note.textContent = permission === 'granted'
+    ? say('ဖွင့်ပြီးပါပြီ — app ဖွင့်ထားစဉ်သာ အလုပ်လုပ်ပါမည်။',
+          'Enabled — this works while the app is open.')
+    : say('ခွင့်ပြုချက် မရပါ။', 'Permission was declined.');
+}
+
+// watch the reader's township and speak up when it crosses their threshold
+let lastNotifiedLevel = null;
+
+function checkThreshold() {
+  const row = state.live && state.live.townships.find((r) => r.name === state.township);
+  if (!row) return;
+
+  const limit = Number(localStorage.getItem(`${STORE}:threshold`) || 36);
+  const over = row.temp >= limit;
+
+  if (over && lastNotifiedLevel !== 'over') {
+    pushNotice(say(`${label(row)} က ${row.temp}°C — ကန့်သတ်ချက် ${limit}°C ကျော်သွားပါပြီ။`,
+                   `${label(row)} is ${row.temp}°C, above your ${limit}°C limit.`));
+    lastNotifiedLevel = 'over';
+  } else if (!over && lastNotifiedLevel === 'over') {
+    pushNotice(say(`${label(row)} က ${row.temp}°C — ကန့်သတ်ချက်အောက် ပြန်ရောက်ပါပြီ။`,
+                   `${label(row)} is back below your limit at ${row.temp}°C.`));
+    lastNotifiedLevel = 'under';
+  }
+}
+
 /* ------------------------------------------------------------------- forms */
 
 function wireForms() {
   const threshold = $('threshold');
+  threshold.value = localStorage.getItem(`${STORE}:threshold`) || 36;
+  $('thresholdOut').textContent = `${threshold.value} °C`;
   threshold.addEventListener('input', () => {
     $('thresholdOut').textContent = `${threshold.value} °C`;
+    localStorage.setItem(`${STORE}:threshold`, threshold.value);
   });
 
   const intensity = $('intensity');
@@ -921,8 +1303,8 @@ function wireForms() {
       });
       note.className = 'formnote ok';
       note.textContent = say(
-        `${state.township} ${threshold.value}°C ကျော်လျှင် အီးမေးလ်ပို့ပါမည်။`,
-        `We will email you when ${state.township} passes ${threshold.value}°C.`);
+        `မှတ်တမ်းတင်ပြီးပါပြီ — ${state.township} ${threshold.value}°C ကျော်လျှင် ပို့ပါမည်။`,
+        `Saved — you are on the list for ${state.township} above ${threshold.value}°C.`);
       event.target.reset();
       $('thresholdOut').textContent = '36 °C';
     } catch (error) {
@@ -989,6 +1371,41 @@ async function start() {
   $('cmpB').addEventListener('change', renderCompare);
   $('canopy').addEventListener('input', renderGreening);
 
+  document.querySelectorAll('.nav-item').forEach((item) => {
+    item.addEventListener('click', () => showView(item.dataset.view));
+  });
+  $('burger').addEventListener('click', () =>
+    $('sidenav').classList.contains('is-open') ? closeDrawer() : openDrawer());
+  $('scrim').addEventListener('click', closeDrawer);
+
+  const openChat = () => {
+    $('chatSheet').hidden = false;
+    if (!chatHistory.length) greetChat();
+    setTimeout(() => $('chatInput').focus(), 120);
+  };
+  const closeChat = () => { $('chatSheet').hidden = true; };
+
+  $('fab').addEventListener('click', openChat);
+  $('chatClose').addEventListener('click', closeChat);
+  $('chatScrim').addEventListener('click', closeChat);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { closeChat(); closeDrawer(); }
+  });
+
+  $('installGo').addEventListener('click', runInstall);
+  $('installDismiss').addEventListener('click', () => {
+    $('installBar').hidden = true;
+    localStorage.setItem(`${STORE}:install-dismissed`, '1');
+  });
+
+  // Safari never announces itself, so offer the walkthrough after a short wait
+  if (isIOS() && !isStandalone()) {
+    setTimeout(() => showInstallBar('ios'), 2500);
+  }
+
+  $('bellBtn').addEventListener('click', showNotices);
+  $('notifyBtn').addEventListener('click', enableNotifications);
+
   $('micBtn').addEventListener('click', toggleRecording);
   $('pdfBtn').addEventListener('click', downloadPdf);
   $('printBtn').addEventListener('click', () => window.print());
@@ -1027,9 +1444,17 @@ async function start() {
   fillCompare();
   renderRibbon();
   renderGreening();
-  renderHistory();
   setupSatellite();
-  greetChat();
+  checkThreshold();
+
+  $('alertStatus').textContent = say(
+    'အီးမေးလ် သတိပေးချက်များကို နာရီတိုင်း စစ်ဆေးပြီး ပို့ပါသည်။ ဆာဗာတွင် အီးမေးလ် အချက်အလက် မထည့်ရသေးပါက မှတ်ပုံတင်ထားသော်လည်း စာမပို့နိုင်သေးပါ။',
+    'Email alerts are checked hourly. If the server has no mail credentials yet, your subscription is stored but nothing is sent.');
+
+  const wanted = new URLSearchParams(location.search).get('view');
+  showView(['today','map','air','compare','trees','history','alerts','report']
+    .includes(wanted) ? wanted : 'today');
+
   await loadDetail();
 
   // keep the reading fresh while the page stays open
@@ -1037,6 +1462,8 @@ async function start() {
     try {
       await loadLive();
       renderRibbon();
+      checkThreshold();
+      if (state.view === 'air') renderAir();
       loadDetail();
     } catch (_) { /* offline handling already reported it */ }
   }, 10 * 60 * 1000);
