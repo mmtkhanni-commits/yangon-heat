@@ -54,6 +54,13 @@ def _q(sql):
 
 
 SCHEMA_PG = [
+    """CREATE TABLE IF NOT EXISTS live_cache (
+        id SMALLINT PRIMARY KEY DEFAULT 1,
+        payload TEXT NOT NULL,
+        fetched_at TIMESTAMPTZ NOT NULL,
+        next_fetch_at TIMESTAMPTZ NOT NULL,
+        CHECK (id = 1)
+    )""",
     """CREATE TABLE IF NOT EXISTS reports (
         id SERIAL PRIMARY KEY,
         submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -83,6 +90,12 @@ SCHEMA_PG = [
 ]
 
 SCHEMA_SQLITE = [
+    """CREATE TABLE IF NOT EXISTS live_cache (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        payload TEXT NOT NULL,
+        fetched_at TEXT NOT NULL,
+        next_fetch_at TEXT NOT NULL
+    )""",
     """CREATE TABLE IF NOT EXISTS reports (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         submitted_at TEXT NOT NULL,
@@ -199,6 +212,39 @@ def mark_sent(sub_id):
             cur.execute("UPDATE subscriptions SET last_sent = NOW() WHERE id = %s", (sub_id,))
         else:
             cur.execute("UPDATE subscriptions SET last_sent = ? WHERE id = ?", (_now(), sub_id))
+
+
+# ---------------------------------------------------------------- live cache
+
+def get_live_cache():
+    """The one stored /api/live payload, or None if nothing has been fetched
+    yet. A single row (id=1), upserted on every successful fetch."""
+    with connection() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT payload, fetched_at, next_fetch_at FROM live_cache WHERE id = 1")
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+
+def save_live_cache(payload_json, fetched_at, next_fetch_at):
+    """payload_json is already-serialised JSON text; fetched_at and
+    next_fetch_at are ISO 8601 strings."""
+    with connection() as conn:
+        cur = conn.cursor()
+        if IS_POSTGRES:
+            cur.execute(
+                "INSERT INTO live_cache (id, payload, fetched_at, next_fetch_at) "
+                "VALUES (1, %s, %s, %s) ON CONFLICT (id) DO UPDATE SET "
+                "payload = EXCLUDED.payload, fetched_at = EXCLUDED.fetched_at, "
+                "next_fetch_at = EXCLUDED.next_fetch_at",
+                (payload_json, fetched_at, next_fetch_at))
+        else:
+            cur.execute(
+                "INSERT INTO live_cache (id, payload, fetched_at, next_fetch_at) "
+                "VALUES (1, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET "
+                "payload = excluded.payload, fetched_at = excluded.fetched_at, "
+                "next_fetch_at = excluded.next_fetch_at",
+                (payload_json, fetched_at, next_fetch_at))
 
 
 # ----------------------------------------------------------------- readings

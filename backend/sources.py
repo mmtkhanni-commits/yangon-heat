@@ -10,10 +10,14 @@ from __future__ import annotations
 import difflib
 import json
 import math
+import threading
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
+
+import db
 
 CACHE_DIR = Path(__file__).parent / "cache"
 CACHE_DIR.mkdir(exist_ok=True)
@@ -327,32 +331,99 @@ def aqi_band(value):
     return "unhealthy"
 
 
-def fetch_live():
-    """Current temperature and air quality for every township."""
-    cached = _read_cache("live.json", max_age_seconds=600)
-    if cached:
-        return cached
+_live_lock = threading.Lock()
+FETCH_INTERVAL = timedelta(hours=1)
 
+
+def _get_with_retry(client, url, params, attempts=3):
+    """Open-Meteo occasionally answers 429 when several requests land close
+    together - a cold Render instance plus several visitors arriving at once
+    is enough to trigger it. Back off and retry rather than failing the whole
+    /api/live call over a transient rate limit."""
+    last_error = None
+    for attempt in range(attempts):
+        response = client.get(url, params=params)
+        if response.status_code == 429:
+            last_error = RuntimeError("rate limited (429)")
+            time.sleep(1.5 * (2 ** attempt))
+            continue
+        response.raise_for_status()
+        return response
+    raise last_error
+
+
+def _parse_ts(value):
+    dt = datetime.fromisoformat(value)
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def fetch_live():
+    """Current temperature and air quality for every township, refetched from
+    Open-Meteo at most once per hour.
+
+    The previous version cached to a local file, which Render's free tier
+    wipes every time the instance spins down from inactivity and restarts -
+    a very ordinary thing to happen overnight. Every restart meant a fresh
+    full fetch, and enough visitors arriving close together during one of
+    those windows was what triggered the 429s. The cache now lives in
+    Postgres, which survives restarts and deploys, so the hourly gate holds
+    even when the server itself does not.
+    """
+    row = db.get_live_cache()
+    if row and datetime.now(timezone.utc) < _parse_ts(row["next_fetch_at"]):
+        payload = json.loads(row["payload"])
+        payload["stale"] = False
+        payload["next_fetch_at"] = row["next_fetch_at"]
+        return payload
+
+    with _live_lock:
+        # someone else may have refreshed it while this call waited for the lock
+        row = db.get_live_cache()
+        if row and datetime.now(timezone.utc) < _parse_ts(row["next_fetch_at"]):
+            payload = json.loads(row["payload"])
+            payload["stale"] = False
+            payload["next_fetch_at"] = row["next_fetch_at"]
+            return payload
+
+        try:
+            payload = _fetch_live_uncached()
+            fetched_at = datetime.now(timezone.utc)
+            next_fetch_at = fetched_at + FETCH_INTERVAL
+            db.save_live_cache(json.dumps(payload), fetched_at.isoformat(),
+                               next_fetch_at.isoformat())
+            payload = dict(payload)
+            payload["stale"] = False
+            payload["next_fetch_at"] = next_fetch_at.isoformat()
+            return payload
+        except Exception:
+            # Open-Meteo itself is unreachable or still rate limiting - serve
+            # whatever was last stored rather than a 503 for every visitor
+            if row:
+                payload = json.loads(row["payload"])
+                payload["stale"] = True
+                return payload
+            raise
+
+
+def _fetch_live_uncached():
     townships, meta = get_townships()
     lats = ",".join(f"{t['coords'][0]:.4f}" for t in townships)
     lons = ",".join(f"{t['coords'][1]:.4f}" for t in townships)
 
     with httpx.Client(timeout=30) as client:
-        weather = client.get(WEATHER_URL, params={
+        weather = _get_with_retry(client, WEATHER_URL, {
             "latitude": lats, "longitude": lons,
             "current": ("temperature_2m,relative_humidity_2m,apparent_temperature,"
                         "wind_speed_10m,uv_index,is_day,precipitation"),
             "timezone": "Asia/Yangon",
         })
-        weather.raise_for_status()
         weather_rows = _as_list(weather.json())
 
         try:
-            air = client.get(AIR_URL, params={
+            air = _get_with_retry(client, AIR_URL, {
                 "latitude": lats, "longitude": lons,
                 "current": "us_aqi,pm2_5", "timezone": "Asia/Yangon",
             })
-            air.raise_for_status()
             air_rows = _as_list(air.json())
         except Exception:
             air_rows = []
