@@ -277,8 +277,13 @@ async function api(path, options = {}, attempt = 0) {
       ...options,
     });
   } catch (networkError) {
-    // free hosting sleeps when idle and can take most of a minute to wake
-    if (attempt < 2 && (!options.method || options.method === 'GET')) {
+    // free hosting sleeps when idle and can take most of a minute to wake.
+    // Only retry reads and the assistant — never a write, which would submit
+    // a report or subscription twice.
+    const safeToRetry = !options.method || options.method === 'GET'
+      || path === '/api/chat';
+
+    if (attempt < 2 && safeToRetry) {
       if (attempt === 0) {
         toast(say('ဆာဗာကို နှိုးနေသည် — ခဏစောင့်ပါ…',
                   'Waking the server — this can take up to a minute…'));

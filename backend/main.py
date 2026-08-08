@@ -32,12 +32,17 @@ app = FastAPI(
     ),
 )
 
-ALLOWED_ORIGINS = [o for o in os.environ.get("ALLOWED_ORIGINS", "*").split(",") if o]
+ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "*").split(",")
+                   if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS or ["*"],
-    allow_methods=["GET", "POST", "DELETE"],
+    # OPTIONS matters: a POST carrying JSON is preflighted, and the preflight
+    # fails silently in the browser as "Failed to fetch" if it is not allowed
+    allow_methods=["*"],
     allow_headers=["*"],
+    max_age=3600,
 )
 
 
@@ -409,6 +414,10 @@ def unsubscribe(email: EmailStr, township: str | None = None):
 
 # Serve the built frontend from the same origin when it is present, so a single
 # deployment can host both. Keep this last: it claims every remaining path.
-FRONTEND_DIR = os.environ.get("FRONTEND_DIR", "../frontend")
-if os.path.isdir(FRONTEND_DIR):
+# Windows keeps the folder as "Frontend" and will not let git rename it, so
+# accept either spelling rather than fighting the filesystem.
+_candidates = [os.environ.get("FRONTEND_DIR"), "../frontend", "../Frontend",
+               "frontend", "Frontend"]
+FRONTEND_DIR = next((p for p in _candidates if p and os.path.isdir(p)), None)
+if FRONTEND_DIR:
     app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
