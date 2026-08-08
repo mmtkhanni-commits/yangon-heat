@@ -22,6 +22,7 @@ const state = {
   lang: localStorage.getItem(`${STORE}:lang`) || 'my',
   township: localStorage.getItem(`${STORE}:township`) || null,
   view: 'today',
+  lastAdvice: '',
   live: null,
 };
 
@@ -383,9 +384,7 @@ function showView(name) {
   }
   if (name === 'map') renderMap();
   if (name === 'air') renderAir();
-  if (name === 'trees') renderGreening();
-  if (name === 'history') renderHistory();
-  if (name === 'compare') fillCompare();
+  if (name === 'compare') { fillCompare(); renderHistory(); }
 }
 
 function openDrawer() {
@@ -520,7 +519,7 @@ function renderHero(detail) {
 
   $('temp').textContent = t.temp.toFixed(1);
   $('verdict').textContent = state.lang === 'my' ? g.headline_my : g.headline_en;
-  $('advice').textContent = state.lang === 'my' ? g.advice_my : g.advice_en;
+  renderAdvice(g);
 
   const colour = LEVEL_COLOUR[g.level] || 'var(--muted)';
   $('hero').style.borderLeftColor = colour;
@@ -908,6 +907,117 @@ function renderCompare() {
     `<p class="verdict-line">${line}</p>`;
 }
 
+/* ------------------------------------------------------------ illustration */
+
+// Small scenes drawn inline rather than shipped as images, so they follow the
+// palette, animate, and cost nothing to load.
+const ART = {
+  comfortable: `<svg viewBox="0 0 80 80" width="78" height="78">
+    <circle cx="40" cy="40" r="30" fill="#1B3326"/>
+    <g class="sway">
+      <rect x="38" y="46" width="4" height="16" rx="1.5" fill="#6b4b32"/>
+      <circle cx="40" cy="41" r="15" fill="#4E9E7E"/>
+      <circle cx="33" cy="37" r="9" fill="#7CC49B"/>
+      <circle cx="47" cy="39" r="7" fill="#3d8f6d"/>
+    </g>
+    <circle cx="62" cy="20" r="7" fill="#E3A857" class="shimmer"/>
+  </svg>`,
+
+  warm: `<svg viewBox="0 0 80 80" width="78" height="78">
+    <circle cx="40" cy="40" r="30" fill="#1B3326"/>
+    <circle cx="59" cy="21" r="9" fill="#E3A857" class="shimmer"/>
+    <g class="sway">
+      <rect x="24" y="44" width="3.5" height="18" rx="1.5" fill="#6b4b32"/>
+      <circle cx="26" cy="40" r="13" fill="#4E9E7E"/>
+      <circle cx="21" cy="36" r="7" fill="#7CC49B"/>
+    </g>
+    <g class="bob">
+      <rect x="50" y="42" width="13" height="22" rx="5" fill="#3D8FA6"/>
+      <rect x="52" y="46" width="9" height="15" rx="3" fill="#7CC49B" opacity="0.85"/>
+      <rect x="53" y="38" width="7" height="5" rx="2" fill="#B7E4C7"/>
+    </g>
+  </svg>`,
+
+  warning: `<svg viewBox="0 0 80 80" width="78" height="78">
+    <circle cx="40" cy="40" r="30" fill="#2b2419"/>
+    <circle cx="40" cy="26" r="12" fill="#E3A857" class="shimmer"/>
+    <g stroke="#E3A857" stroke-width="2.5" stroke-linecap="round" class="shimmer">
+      <line x1="40" y1="6" x2="40" y2="11"/>
+      <line x1="22" y1="26" x2="17" y2="26"/>
+      <line x1="63" y1="26" x2="58" y2="26"/>
+      <line x1="26" y1="12" x2="23" y2="9"/>
+      <line x1="54" y1="12" x2="57" y2="9"/>
+    </g>
+    <g class="sip">
+      <rect x="30" y="48" width="16" height="20" rx="4" fill="#3D8FA6"/>
+      <rect x="33" y="52" width="10" height="13" rx="2" fill="#7CC49B"/>
+      <rect x="34" y="44" width="8" height="5" rx="2" fill="#B7E4C7"/>
+    </g>
+    <path d="M52 52 q6 -8 6 -13 q0 5 6 13 a6 6 0 1 1 -12 0z" fill="#7CC49B" class="bob"/>
+  </svg>`,
+
+  danger: `<svg viewBox="0 0 80 80" width="78" height="78">
+    <circle cx="40" cy="40" r="30" fill="#31201c"/>
+    <circle cx="40" cy="24" r="13" fill="#C9502F" class="shimmer"/>
+    <g stroke="#A31E1E" stroke-width="3" stroke-linecap="round" class="shimmer">
+      <line x1="40" y1="3" x2="40" y2="9"/>
+      <line x1="19" y1="24" x2="13" y2="24"/>
+      <line x1="61" y1="24" x2="67" y2="24"/>
+    </g>
+    <g class="bob">
+      <path d="M20 62 q10 -22 20 -22 q10 0 20 22z" fill="#235138"/>
+      <rect x="36" y="58" width="8" height="10" rx="2" fill="#4E9E7E"/>
+    </g>
+    <text x="40" y="52" text-anchor="middle" font-size="13" fill="#B7E4C7">🏠</text>
+  </svg>`,
+};
+
+function renderAdvice(guide) {
+  const key = guide.level === 'comfortable' ? 'comfortable'
+    : guide.level === 'warm' ? 'warm'
+    : guide.level === 'warning' ? 'warning' : 'danger';
+
+  $('adviceArt').innerHTML = ART[key];
+  $('adviceTitle').textContent = state.lang === 'my' ? guide.headline_my : guide.headline_en;
+  $('advice').textContent = state.lang === 'my' ? guide.advice_my : guide.advice_en;
+  state.lastAdvice = `${$('adviceTitle').textContent}. ${$('advice').textContent}`;
+}
+
+/* ------------------------------------------------------------------ speech */
+
+function speak(text) {
+  if (!window.speechSynthesis) {
+    toast(say('ဤ browser တွင် အသံဖတ်ခြင်း မရနိုင်ပါ။',
+              'This browser cannot read text aloud.'));
+    return;
+  }
+  speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  // Burmese voices are rare on most devices; the browser falls back on its own
+  utterance.lang = state.lang === 'my' ? 'my-MM' : 'en-US';
+  utterance.rate = 0.95;
+  speechSynthesis.speak(utterance);
+}
+
+function chime() {
+  // a short two-note tone, built with the audio API so there is no file to load
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [880, 1320].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + i * 0.18);
+      gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + i * 0.18 + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + i * 0.18 + 0.34);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.18);
+      osc.stop(ctx.currentTime + i * 0.18 + 0.36);
+    });
+  } catch (_) { /* autoplay policy blocked it; the notification still shows */ }
+}
+
 /* --------------------------------------------------------------- air quality */
 
 // WHO 2021 24-hour guideline is 15 ug/m3; the interim targets step up from there
@@ -924,16 +1034,96 @@ function pm25Colour(value) {
   return (WHO_STEPS.find((s) => value <= s.limit) || WHO_STEPS[WHO_STEPS.length - 1]).colour;
 }
 
+const UV_WORDS = {
+  low: ['နိမ့်', 'Low'], moderate: ['အလယ်အလတ်', 'Moderate'],
+  high: ['မြင့်', 'High'], very_high: ['အလွန်မြင့်', 'Very high'],
+  extreme: ['အလွန်အမင်း', 'Extreme'], unknown: ['မသိရ', 'No reading'],
+};
+
+const UV_COLOUR = {
+  low: '#4E9E7E', moderate: '#8FBF6A', high: '#E3A857',
+  very_high: '#C9502F', extreme: '#A31E1E', unknown: 'var(--muted)',
+};
+
+const TILE_ART = {
+  uv: `<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="9" fill="#E3A857"/>
+       <g stroke="#E3A857" stroke-width="2.5" stroke-linecap="round">
+       <line x1="20" y1="3" x2="20" y2="8"/><line x1="20" y1="32" x2="20" y2="37"/>
+       <line x1="3" y1="20" x2="8" y2="20"/><line x1="32" y1="20" x2="37" y2="20"/>
+       <line x1="8" y1="8" x2="11" y2="11"/><line x1="29" y1="29" x2="32" y2="32"/>
+       <line x1="32" y1="8" x2="29" y2="11"/><line x1="11" y1="29" x2="8" y2="32"/></g></svg>`,
+  humidity: `<svg viewBox="0 0 40 40">
+       <path d="M20 6 q9 12 9 18 a9 9 0 1 1 -18 0 q0 -6 9 -18z" fill="#3D8FA6"/>
+       <ellipse cx="16" cy="26" rx="3" ry="4" fill="#7CC49B" opacity="0.7"/></svg>`,
+  wind: `<svg viewBox="0 0 40 40" stroke="#7CC49B" stroke-width="2.6"
+       stroke-linecap="round" fill="none">
+       <path d="M5 14 h16 a4 4 0 1 0 -4 -4"/>
+       <path d="M5 22 h22 a4 4 0 1 1 -4 4"/>
+       <path d="M5 30 h12"/></svg>`,
+  pm: `<svg viewBox="0 0 40 40"><circle cx="12" cy="14" r="4" fill="#8AA394"/>
+       <circle cx="24" cy="10" r="2.5" fill="#8AA394"/>
+       <circle cx="28" cy="22" r="5" fill="#8AA394"/>
+       <circle cx="15" cy="27" r="3" fill="#8AA394"/>
+       <circle cx="25" cy="32" r="2" fill="#8AA394"/></svg>`,
+};
+
+function renderEnvTiles() {
+  const mine = state.live.townships.find((r) => r.name === state.township);
+  if (!mine) return;
+
+  const tile = (art, title, big, sub, colour, fill) => `
+    <div class="tile">
+      <h3>${title}</h3>
+      <div class="big" style="color:${colour}">${big}</div>
+      <div class="sub" style="color:${colour}">${sub}</div>
+      ${fill != null ? `<div class="gauge"><i style="width:${fill}%;background:${colour}"></i></div>` : ''}
+      <span class="art">${art}</span>
+    </div>`;
+
+  const uvBand = mine.uv_band || 'unknown';
+  const uvWords = UV_WORDS[uvBand] || UV_WORDS.unknown;
+  const uvAdvice = ['high', 'very_high', 'extreme'].includes(uvBand)
+    ? say('အရိပ်ရှာပါ', 'seek shade')
+    : say('အန္တရာယ်နည်း', 'low risk');
+
+  const humid = mine.humidity;
+  const humidNote = humid == null ? ''
+    : humid >= 80 ? say('ချွေးမခြောက်၍ ပိုပူသလို ခံစားရမည်', 'sweat evaporates slowly, so it feels hotter')
+    : humid >= 60 ? say('သာမန်', 'typical')
+    : say('ခြောက်သွေ့', 'dry');
+
+  $('envTiles').innerHTML =
+    tile(TILE_ART.uv, say('ခရမ်းလွန်ရောင်ခြည် (UV)', 'Ultraviolet (UV)'),
+         mine.uv != null ? mine.uv : '—',
+         `${say(uvWords[0], uvWords[1])} · ${uvAdvice}`,
+         UV_COLOUR[uvBand], mine.uv != null ? Math.min(mine.uv / 12, 1) * 100 : null) +
+    tile(TILE_ART.humidity, say('စိုထိုင်းဆ', 'Humidity'),
+         humid != null ? `${humid}%` : '—', humidNote, '#5FB3C9',
+         humid != null ? humid : null) +
+    tile(TILE_ART.wind, say('လေတိုက်နှုန်း', 'Wind'),
+         mine.wind != null ? mine.wind : '—', 'km/h', 'var(--shoot)',
+         mine.wind != null ? Math.min(mine.wind / 40, 1) * 100 : null) +
+    tile(TILE_ART.pm, 'PM2.5',
+         mine.pm25 != null ? mine.pm25 : '—',
+         mine.pm25 != null
+           ? say(`WHO ၏ ${(mine.pm25 / 15).toFixed(1)} ဆ`, `${(mine.pm25 / 15).toFixed(1)}× WHO`)
+           : say('တိုင်းတာချက် မရှိ', 'no reading'),
+         pm25Colour(mine.pm25),
+         mine.pm25 != null ? Math.min(mine.pm25 / 75, 1) * 100 : null);
+}
+
 function renderAir() {
+  renderEnvTiles();
+  renderGreening();
+
   const rows = state.live.townships;
   const mine = rows.find((r) => r.name === state.township);
   const withPm = rows.filter((r) => r.pm25 != null);
 
   if (!withPm.length) {
-    $('airHero').innerHTML =
-      `<p class="note">${say('PM2.5 အချက်အလက် မရနိုင်သေးပါ။',
-                            'No PM2.5 readings available right now.')}</p>`;
     $('whoBar').innerHTML = '';
+    $('whoNote').textContent = say('PM2.5 အချက်အလက် မရနိုင်သေးပါ။',
+                                   'No PM2.5 readings available right now.');
     $('airRank').innerHTML = '';
     return;
   }
@@ -941,28 +1131,6 @@ function renderAir() {
   const cityPm = withPm.reduce((sum, r) => sum + r.pm25, 0) / withPm.length;
   const worst = withPm.reduce((a, b) => (a.pm25 >= b.pm25 ? a : b));
   const minePm = mine && mine.pm25 != null ? mine.pm25 : null;
-
-  const cell = (title, big, sub, colour) => `
-    <div class="cell" style="border-left-color:${colour}">
-      <h3>${title}</h3>
-      <div class="big" style="color:${colour}">${big}</div>
-      <div class="sub">${sub}</div>
-    </div>`;
-
-  $('airHero').innerHTML =
-    cell(say(`${label(mine)} · PM2.5`, `${label(mine)} · PM2.5`),
-         minePm != null ? minePm : '—',
-         minePm != null
-           ? say(`WHO လမ်းညွှန်ချက်၏ ${(minePm / 15).toFixed(1)} ဆ`,
-                 `${(minePm / 15).toFixed(1)}× the WHO guideline`)
-           : say('တိုင်းတာချက် မရှိ', 'no reading'),
-         pm25Colour(minePm)) +
-    cell(say('မြို့ပျမ်းမျှ', 'City average'), cityPm.toFixed(1),
-         say('µg/m³', 'µg/m³'), pm25Colour(cityPm)) +
-    cell(say('အဆိုးဆုံး', 'Worst'), worst.pm25,
-         label(worst), pm25Colour(worst.pm25)) +
-    cell(say('US AQI', 'US AQI'), mine && mine.aqi ? mine.aqi : '—',
-         mine ? aqiWords(mine.aqi_band) : '', 'var(--river)');
 
   // the WHO scale, with a marker showing where the reader's township sits
   const shown = minePm != null ? minePm : cityPm;
@@ -1033,6 +1201,12 @@ function drawTreeScene(pct, drop, baseTemp) {
              animation-delay:${(i * 0.06).toFixed(2)}s">
                <span class="canopy"></span><span class="trunk"></span>
              </span>`;
+  }
+
+  // a couple of birds arrive once the canopy is worth living in
+  if (trees >= 5) {
+    html += `<span class="bird" style="left:22%;top:22%"></span>`;
+    html += `<span class="bird" style="left:64%;top:15%;animation-delay:1.1s"></span>`;
   }
 
   html += `<span class="drop">${baseTemp}° → ${(baseTemp - drop).toFixed(1)}°</span>`;
@@ -1208,6 +1382,11 @@ const notes = [];
 function pushNotice(text) {
   notes.unshift({ text, at: new Date() });
   $('bellDot').hidden = false;
+
+  if (localStorage.getItem(`${STORE}:sound`) === '1') {
+    chime();
+    setTimeout(() => speak(text), 700);
+  }
 
   // a real background push needs a push service and a paid worker to run it;
   // this fires only while the page is open, which is what it says on the button
@@ -1392,6 +1571,21 @@ async function start() {
     if (e.key === 'Escape') { closeChat(); closeDrawer(); }
   });
 
+  $('speakBtn').addEventListener('click', () => {
+    if (state.lastAdvice) speak(state.lastAdvice);
+  });
+
+  const sound = $('soundToggle');
+  sound.checked = localStorage.getItem(`${STORE}:sound`) === '1';
+  sound.addEventListener('change', () => {
+    localStorage.setItem(`${STORE}:sound`, sound.checked ? '1' : '0');
+    if (sound.checked) {
+      chime();
+      setTimeout(() => speak(say('သတိပေးချက် အသံ ဖွင့်ပြီးပါပြီ။',
+                                 'Alert sound is on.')), 500);
+    }
+  });
+
   $('installGo').addEventListener('click', runInstall);
   $('installDismiss').addEventListener('click', () => {
     $('installBar').hidden = true;
@@ -1452,7 +1646,7 @@ async function start() {
     'Email alerts are checked hourly. If the server has no mail credentials yet, your subscription is stored but nothing is sent.');
 
   const wanted = new URLSearchParams(location.search).get('view');
-  showView(['today','map','air','compare','trees','history','alerts','report']
+  showView(['today','map','air','compare','alerts','report']
     .includes(wanted) ? wanted : 'today');
 
   await loadDetail();

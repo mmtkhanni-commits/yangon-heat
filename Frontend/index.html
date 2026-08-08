@@ -68,20 +68,12 @@
       <span data-my="မြေပုံ" data-en="Map">မြေပုံ</span>
     </button>
     <button class="nav-item" data-view="air">
-      <span class="ico" aria-hidden="true">💨</span>
-      <span data-my="လေထု" data-en="Air">လေထု</span>
+      <span class="ico" aria-hidden="true">🌿</span>
+      <span data-my="ပတ်ဝန်းကျင်" data-en="Environment">ပတ်ဝန်းကျင်</span>
     </button>
     <button class="nav-item" data-view="compare">
-      <span class="ico" aria-hidden="true">⚖️</span>
-      <span data-my="နှိုင်းယှဉ်" data-en="Compare">နှိုင်းယှဉ်</span>
-    </button>
-    <button class="nav-item" data-view="trees">
-      <span class="ico" aria-hidden="true">🌳</span>
-      <span data-my="သစ်ပင်" data-en="Trees">သစ်ပင်</span>
-    </button>
-    <button class="nav-item" data-view="history">
-      <span class="ico" aria-hidden="true">📉</span>
-      <span data-my="သမိုင်း" data-en="History">သမိုင်း</span>
+      <span class="ico" aria-hidden="true">📊</span>
+      <span data-my="ခွဲခြမ်းစိတ်ဖြာ" data-en="Insights">ခွဲခြမ်းစိတ်ဖြာ</span>
     </button>
     <button class="nav-item" data-view="alerts">
       <span class="ico" aria-hidden="true">🔔</span>
@@ -111,7 +103,17 @@
 
         <p class="reading"><span id="temp">--</span><span class="unit">°C</span></p>
         <p class="verdict" id="verdict">…</p>
-        <p class="advice" id="advice"></p>
+
+        <div class="advice-card">
+          <div class="advice-art" id="adviceArt" aria-hidden="true"></div>
+          <div class="advice-copy">
+            <b id="adviceTitle"></b>
+            <span id="advice"></span>
+          </div>
+        </div>
+        <button class="speak" id="speakBtn" type="button"
+                data-my="🔊 အသံဖြင့် နားထောင်ရန်" data-en="🔊 Read this aloud">
+          🔊 အသံဖြင့် နားထောင်ရန်</button>
 
         <dl class="chips">
           <div><dt data-my="ခံစားရသော" data-en="Feels like">ခံစားရသော</dt><dd id="feels">--</dd></div>
@@ -186,17 +188,37 @@
 
     <section class="view" id="view-air">
       <div class="panel">
-        <h2 data-my="လေထုအရည်အသွေး" data-en="Air quality">လေထုအရည်အသွေး</h2>
-        <p class="note" data-my="PM2.5 သည် အဆုတ်ထဲအထိ ဝင်ရောက်နိုင်သော အမှုန်အမွှားများဖြစ်သည်။"
-           data-en="PM2.5 is fine particulate small enough to reach deep into the lungs.">
-           PM2.5 သည် အဆုတ်ထဲအထိ ဝင်ရောက်နိုင်သော အမှုန်အမွှားများဖြစ်သည်။</p>
+        <h2 data-my="ယနေ့ ပတ်ဝန်းကျင်အခြေအနေ" data-en="Conditions right now">ယနေ့ ပတ်ဝန်းကျင်အခြေအနေ</h2>
+        <p class="note" data-my="သင့်မြို့နယ်၏ လေထု၊ ခရမ်းလွန်ရောင်ခြည်နှင့် စိုထိုင်းဆ။"
+           data-en="Air, ultraviolet and humidity for your township.">
+           သင့်မြို့နယ်၏ လေထု၊ ခရမ်းလွန်ရောင်ခြည်နှင့် စိုထိုင်းဆ။</p>
+        <div class="tiles" id="envTiles"></div>
+      </div>
 
-        <div class="air-hero" id="airHero"></div>
+      <div class="panel">
+        <h2 data-my="PM2.5 အမှုန်အမွှား" data-en="PM2.5 particulate">PM2.5 အမှုန်အမွှား</h2>
+        <p class="note" data-my="အဆုတ်ထဲအထိ ဝင်ရောက်နိုင်သော အမှုန်များ။ WHO လမ်းညွှန်ချက် ၁၅ µg/m³။"
+           data-en="Fine particles small enough to reach deep into the lungs. The WHO guideline is 15 µg/m³.">
+           အဆုတ်ထဲအထိ ဝင်ရောက်နိုင်သော အမှုန်များ။</p>
         <div class="who-bar" id="whoBar"></div>
         <p class="note" id="whoNote"></p>
-
-        <h3 class="sub" data-my="မြို့နယ်အလိုက် PM2.5" data-en="PM2.5 by township">မြို့နယ်အလိုက် PM2.5</h3>
+        <h3 class="sub" data-my="မြို့နယ်အလိုက်" data-en="By township">မြို့နယ်အလိုက်</h3>
         <div class="rank" id="airRank"></div>
+      </div>
+
+      <div class="panel">
+        <h2 data-my="သစ်ပင်စိုက်လျှင် ဘယ်လောက် အေးမလဲ" data-en="How much would trees cool it">သစ်ပင်စိုက်လျှင် ဘယ်လောက် အေးမလဲ</h2>
+        <div class="scene" id="treeScene" aria-hidden="true"></div>
+        <label class="slider">
+          <span data-my="သစ်ပင်ဖုံးလွှမ်းမှု တိုးမည်" data-en="Extra canopy cover">သစ်ပင်ဖုံးလွှမ်းမှု တိုးမည်</span>
+          <output id="canopyOut">20%</output>
+          <input type="range" id="canopy" min="5" max="50" step="5" value="20">
+        </label>
+        <div class="cmp" id="greenResult"></div>
+        <p class="note"
+           data-my="ခန့်မှန်းချက်သာဖြစ်သည်။ လေ့လာမှုများအရ သစ်ပင် ၁ ရာခိုင်နှုန်းလျှင် ၀.၀၂ မှ ၀.၁၅ ဒီဂရီအထိ ကွာပါသည်။"
+           data-en="An estimate. Published cooling per percentage point of canopy ranges from 0.02 to 0.15 °C.">
+           ခန့်မှန်းချက်သာဖြစ်သည်။</p>
       </div>
     </section>
 
@@ -209,28 +231,7 @@
         </div>
         <div class="cmp" id="cmpResult"></div>
       </div>
-    </section>
 
-    <section class="view" id="view-trees">
-      <div class="panel">
-        <h2 data-my="သစ်ပင်စိုက်ခြင်း အကျိုးသက်ရောက်မှု" data-en="Effect of planting trees">သစ်ပင်စိုက်ခြင်း အကျိုးသက်ရောက်မှု</h2>
-
-        <div class="scene" id="treeScene" aria-hidden="true"></div>
-
-        <label class="slider">
-          <span data-my="သစ်ပင်ဖုံးလွှမ်းမှု တိုးမည်" data-en="Extra canopy cover">သစ်ပင်ဖုံးလွှမ်းမှု တိုးမည်</span>
-          <output id="canopyOut">20%</output>
-          <input type="range" id="canopy" min="5" max="50" step="5" value="20">
-        </label>
-        <div class="cmp" id="greenResult"></div>
-        <p class="note"
-           data-my="ဤသည်မှာ ခန့်မှန်းချက်သာဖြစ်ပြီး တိကျသော ရာသီဥတုပုံစံ မဟုတ်ပါ။ လေ့လာမှုများအရ သစ်ပင် ၁ ရာခိုင်နှုန်းလျှင် ၀.၀၂ မှ ၀.၁၅ ဒီဂရီအထိ ကွာပါသည်။"
-           data-en="A linear estimate, not a microclimate model. Published cooling per percentage point of canopy ranges from 0.02 to 0.15 °C.">
-           ဤသည်မှာ ခန့်မှန်းချက်သာဖြစ်ပြီး တိကျသော ရာသီဥတုပုံစံ မဟုတ်ပါ။</p>
-      </div>
-    </section>
-
-    <section class="view" id="view-history">
       <div class="panel">
         <h2 data-my="ရန်ကုန်၏ ရာသီဥတု မှတ်တမ်း" data-en="Yangon's climate record">ရန်ကုန်၏ ရာသီဥတု မှတ်တမ်း</h2>
         <p class="note" id="historyNote"></p>
@@ -266,6 +267,12 @@
         <p class="note" data-my="app ဖွင့်ထားစဉ် သင့်မြို့နယ် ကန့်သတ်ချက်ကျော်လျှင် အသိပေးပါမည်။"
            data-en="While the app is open, we notify you if your township passes the limit.">
            app ဖွင့်ထားစဉ် သင့်မြို့နယ် ကန့်သတ်ချက်ကျော်လျှင် အသိပေးပါမည်။</p>
+        <label class="check">
+          <input type="checkbox" id="soundToggle">
+          <span data-my="သတိပေးချက်နှင့်အတူ အသံဖြင့် ဖတ်ပြရန်"
+                data-en="Read alerts aloud as well">သတိပေးချက်နှင့်အတူ အသံဖြင့် ဖတ်ပြရန်</span>
+        </label>
+
         <button class="ghost" id="notifyBtn" type="button"
                 data-my="ဤစက်တွင် အသိပေးချက် ဖွင့်မည်" data-en="Enable device notifications">
           ဤစက်တွင် အသိပေးချက် ဖွင့်မည်</button>

@@ -91,7 +91,29 @@ def status():
     return {"ready": ready, "message": message, "installed": EE_INSTALLED}
 
 
+_region_cache = {}
+
+
 def _region():
+    """The union of the township polygons, falling back to a bounding box only
+    when the boundary file could not be fetched."""
+    if "geom" in _region_cache:
+        return _region_cache["geom"]
+
+    townships, meta = sources.get_townships()
+    shapes = [ee.Geometry(t["geometry"]) for t in townships if t.get("geometry")]
+
+    if shapes:
+        geom = ee.FeatureCollection([ee.Feature(s) for s in shapes]).geometry().dissolve(100)
+    else:
+        geom = ee.Geometry.Rectangle(YANGON_RECT)
+
+    _region_cache["geom"] = geom
+    return geom
+
+
+def _bbox():
+    """Used only for date filtering, where a rectangle is cheaper and enough."""
     return ee.Geometry.Rectangle(YANGON_RECT)
 
 
@@ -116,7 +138,7 @@ def _landsat_collection(days_back):
     start = end.advance(-days_back, "day")
     return (ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
             .merge(ee.ImageCollection("LANDSAT/LC09/C02/T1_L2"))
-            .filterBounds(_region()).filterDate(start, end)
+            .filterBounds(_bbox()).filterDate(start, end)
             .filter(ee.Filter.lt("CLOUD_COVER", 80)))
 
 

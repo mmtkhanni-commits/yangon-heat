@@ -1,14 +1,23 @@
 /* Palette is the temperature ramp itself — the same scale the readings use,
    so colour always means the same thing wherever it appears. */
 :root {
-  --night:    #0D1117;
-  --slate:    #161C24;
-  --slate-up: #1E252F;
-  --line:     #2A323D;
-  --text:     #E8EDF3;
-  --muted:    #8C97A5;
+  /* base: deep foliage rather than neutral slate */
+  --night:    #0B1410;
+  --slate:    #12211A;
+  --slate-up: #1A2E24;
+  --line:     #26402F;
+  --text:     #E6F1E9;
+  --muted:    #8AA394;
 
-  --river:    #3D7EA6;  /* coolest */
+  /* the living palette — each surface takes its own green so panels are
+     distinguishable without shouting */
+  --moss:     #1B3326;
+  --fern:     #235138;
+  --leaf:     #4E9E7E;
+  --shoot:    #7CC49B;
+  --pale:     #B7E4C7;
+
+  --river:    #3D8FA6;  /* coolest */
   --delta:    #4E9E7E;
   --thanaka:  #E3A857;  /* warm */
   --brick:    #C9502F;
@@ -944,6 +953,33 @@ h3.sub { font-size: 13.5px; margin: 18px 0 8px; color: var(--text); font-family:
   100% { transform: translateY(0) scale(1); opacity: 1; }
 }
 
+.scene .bird {
+  position: absolute;
+  width: 12px; height: 6px;
+  animation: fly 4.5s ease-in-out infinite;
+}
+.scene .bird::before, .scene .bird::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 6px; height: 6px;
+  border-top: 1.8px solid #dff5ea;
+  border-radius: 50%;
+}
+.scene .bird::before { left: 0; transform: rotate(-18deg); }
+.scene .bird::after { right: 0; transform: rotate(18deg); }
+
+@keyframes fly {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(16px, -7px); }
+}
+
+/* rounder, friendlier canopies */
+.scene .tree .canopy {
+  border-radius: 60% 60% 44% 44%;
+  box-shadow: inset -3px -5px 0 rgba(0,0,0,0.14), 0 2px 4px rgba(0,0,0,0.25);
+}
+
 .scene .drop {
   position: absolute; left: 12px; bottom: 8px;
   font-family: var(--mono); font-size: 15px; font-weight: 600;
@@ -1195,3 +1231,103 @@ h3.sub { font-size: 13.5px; margin: 18px 0 8px; color: var(--text); font-family:
 }
 
 @media print { .install { display: none !important; } }
+
+
+/* ════════════════════════════════════════════ varied panel surfaces ═════ */
+
+/* Panels alternate through the green range so a long page reads as a garden
+   rather than one flat sheet. */
+.panel { background: var(--slate); }
+.panel:nth-of-type(2n) { background: linear-gradient(160deg, var(--moss), var(--slate) 70%); }
+.panel:nth-of-type(3n) { background: linear-gradient(160deg, var(--fern) -10%, var(--slate) 62%); }
+
+.panel h2 { color: var(--pale); }
+.custom-section-header, h3.sub { color: var(--shoot); }
+
+.hero {
+  background: linear-gradient(150deg, var(--fern) -20%, var(--slate) 55%);
+}
+
+.chips > div:nth-child(1) { background: linear-gradient(150deg, #1d3a2b, var(--slate-up)); }
+.chips > div:nth-child(2) { background: linear-gradient(150deg, #1b3630, var(--slate-up)); }
+.chips > div:nth-child(3) { background: linear-gradient(150deg, #24382a, var(--slate-up)); }
+
+.stack input, .stack textarea, .pick select, .two select {
+  background: var(--moss);
+  border-color: var(--line);
+}
+.stack input:focus, .stack textarea:focus { border-color: var(--leaf); }
+
+.slider { background: linear-gradient(140deg, var(--moss), var(--slate-up)); }
+
+.nav-item.is-active { background: var(--fern); box-shadow: inset 3px 0 0 var(--shoot); }
+.stack button[type="submit"] { background: var(--shoot); color: #06231a; }
+.chat-form button[type="submit"] { background: var(--shoot); color: #06231a; }
+
+/* ═══════════════════════════════════════════ today: living advice ══════ */
+
+.advice-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 14px;
+  background: linear-gradient(140deg, var(--moss), var(--slate-up));
+  border: 1px solid var(--line);
+}
+
+.advice-art { flex: none; width: 78px; height: 78px; }
+.advice-copy { flex: 1; min-width: 0; }
+.advice-copy b { display: block; font-size: 14px; font-family: var(--burmese); margin-bottom: 3px; }
+.advice-copy span { font-size: 13px; color: var(--text); opacity: 0.85;
+  font-family: var(--burmese); line-height: 1.6; }
+
+.speak {
+  margin-top: 10px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-family: var(--burmese);
+  cursor: pointer;
+}
+.speak:hover { border-color: var(--shoot); color: var(--shoot); }
+
+/* gentle motion in the illustration, paused for anyone who asked for less */
+@keyframes sway { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+@keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes shimmer { 0%,100% { opacity: 0.35; } 50% { opacity: 0.9; } }
+@keyframes sip { 0%,100% { transform: rotate(0deg); } 40% { transform: rotate(-22deg); } }
+
+.advice-art .sway { animation: sway 3.4s ease-in-out infinite; transform-origin: bottom center; }
+.advice-art .bob { animation: bob 2.6s ease-in-out infinite; }
+.advice-art .shimmer { animation: shimmer 2.2s ease-in-out infinite; }
+.advice-art .sip { animation: sip 2.8s ease-in-out infinite; transform-origin: 70% 80%; }
+
+/* ═══════════════════════════════════════ environment: metric tiles ═════ */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.tile {
+  position: relative;
+  overflow: hidden;
+  padding: 13px;
+  border-radius: 13px;
+  background: linear-gradient(150deg, var(--moss), var(--slate-up));
+  border: 1px solid var(--line);
+}
+.tile h3 { margin: 0 0 4px; font-size: 11.5px; color: var(--muted);
+  font-weight: 500; font-family: var(--burmese); }
+.tile .big { font-family: var(--mono); font-size: 24px; font-weight: 600; line-height: 1.1; }
+.tile .sub { margin-top: 4px; font-size: 11.5px; font-family: var(--burmese); }
+.tile .art { position: absolute; right: 8px; bottom: 6px; width: 34px; height: 34px; opacity: 0.55; }
+
+.gauge { height: 6px; border-radius: 3px; background: var(--moss); margin-top: 9px; overflow: hidden; }
+.gauge i { display: block; height: 100%; border-radius: 3px; transition: width 0.6s ease; }

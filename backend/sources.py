@@ -284,6 +284,37 @@ def classify(anomaly):
     return "low", 1
 
 
+def uv_band(value):
+    """WHO UV index categories. Above 8, unprotected skin burns quickly."""
+    if value is None:
+        return "unknown"
+    if value < 3:
+        return "low"
+    if value < 6:
+        return "moderate"
+    if value < 8:
+        return "high"
+    if value < 11:
+        return "very_high"
+    return "extreme"
+
+
+def pm25_band(value):
+    """WHO 2021 24-hour guideline is 15 ug/m3; the interim targets step up
+    from there, so those are the boundaries worth showing."""
+    if value is None:
+        return "unknown"
+    if value <= 15:
+        return "within_who_guideline"
+    if value <= 25:
+        return "interim_target_4"
+    if value <= 37.5:
+        return "interim_target_3"
+    if value <= 50:
+        return "interim_target_2"
+    return "above_all_targets"
+
+
 def aqi_band(value):
     if not value or value <= 0:
         return "unknown"
@@ -309,7 +340,8 @@ def fetch_live():
     with httpx.Client(timeout=30) as client:
         weather = client.get(WEATHER_URL, params={
             "latitude": lats, "longitude": lons,
-            "current": "temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m",
+            "current": ("temperature_2m,relative_humidity_2m,apparent_temperature,"
+                        "wind_speed_10m,uv_index,is_day,precipitation"),
             "timezone": "Asia/Yangon",
         })
         weather.raise_for_status()
@@ -347,6 +379,7 @@ def fetch_live():
         band, level = classify(anomaly)
         aqi = air_cur.get("us_aqi")
         aqi_value = int(round(aqi)) if aqi is not None else 0
+        pm25 = air_cur.get("pm2_5")
         vuln = 50 + anomaly * 18 + (aqi_value - 50) * 0.30
         out.append({
             "name": t["name"],
@@ -356,8 +389,14 @@ def fetch_live():
             "feels_like": cur.get("apparent_temperature"),
             "humidity": cur.get("relative_humidity_2m"),
             "wind": cur.get("wind_speed_10m"),
+            "uv": cur.get("uv_index"),
+            "uv_band": uv_band(cur.get("uv_index")),
+            "is_day": bool(cur.get("is_day")),
+            "rain": cur.get("precipitation"),
             "aqi": aqi_value,
             "aqi_band": aqi_band(aqi_value),
+            "pm25": round(pm25, 1) if pm25 is not None else None,
+            "pm25_band": pm25_band(pm25),
             "anomaly": round(anomaly, 2),
             "uhi_band": band,
             "uhi_level": level,
