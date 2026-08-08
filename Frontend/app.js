@@ -269,11 +269,25 @@ function toast(message) {
 
 /* -------------------------------------------------------------- networking */
 
-async function api(path, options = {}) {
-  const response = await fetch(`${API}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
+async function api(path, options = {}, attempt = 0) {
+  let response;
+  try {
+    response = await fetch(`${API}${path}`, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
+    });
+  } catch (networkError) {
+    // free hosting sleeps when idle and can take most of a minute to wake
+    if (attempt < 2 && (!options.method || options.method === 'GET')) {
+      if (attempt === 0) {
+        toast(say('ဆာဗာကို နှိုးနေသည် — ခဏစောင့်ပါ…',
+                  'Waking the server — this can take up to a minute…'));
+      }
+      await new Promise((resolve) => setTimeout(resolve, 6000));
+      return api(path, options, attempt + 1);
+    }
+    throw networkError;
+  }
   if (!response.ok) {
     let detail = `${response.status}`;
     try {
@@ -982,8 +996,14 @@ async function start() {
   } catch (error) {
     $('verdict').textContent = say('အချက်အလက် မရနိုင်ပါ။', 'Readings unavailable.');
     $('advice').textContent = say(
-      'အင်တာနက် ချိတ်ဆက်မှုကို စစ်ပြီး စာမျက်နှာကို ပြန်ဖွင့်ပါ။',
-      'Check your connection and reload the page.');
+      'ဆာဗာက အိပ်နေခြင်း ဖြစ်နိုင်ပါသည်။ တစ်မိနစ်ခန့် စောင့်ပြီး ပြန်ကြိုးစားပါ။',
+      'The server may still be waking up. Wait a moment and try again.');
+
+    const retry = document.createElement('button');
+    retry.className = 'ghost';
+    retry.textContent = say('ထပ်ကြိုးစားမည်', 'Try again');
+    retry.addEventListener('click', () => location.reload());
+    $('hero').append(retry);
     return;
   }
 

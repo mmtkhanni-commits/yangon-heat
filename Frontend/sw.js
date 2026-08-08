@@ -1,7 +1,11 @@
-/* Cache the shell so the app opens offline, and keep the last successful
-   /api/live response so an offline visitor still sees a reading. */
-const SHELL = 'yangon-heat-shell-v6';
-const DATA = 'yangon-heat-data-v6';
+/* Cache the shell so the app opens offline, and keep the last successful API
+   response so an offline visitor still sees a reading.
+
+   The API now lives on its own origin, so cross-origin requests are passed
+   straight through rather than intercepted — trying to cache them here was
+   turning a slow response into a failed one. */
+const SHELL = 'yangon-heat-shell-v7';
+const DATA = 'yangon-heat-data-v7';
 const FILES = ['./', './index.html', './styles.css', './app.js', './manifest.json'];
 
 self.addEventListener('install', (event) => {
@@ -22,13 +26,16 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
+  // anything on another origin — the API, map tiles, fonts — goes straight to
+  // the network; the page's own code handles its failures
+  if (url.origin !== self.location.origin) return;
+
   if (url.pathname.startsWith('/api/')) {
-    // network first: a stale reading is better than none, but fresh wins
     event.respondWith(
       fetch(request)
         .then((response) => {
           const copy = response.clone();
-          caches.open(DATA).then((c) => c.put(request, copy));
+          caches.open(DATA).then((c) => c.put(request, copy)).catch(() => {});
           return response;
         })
         .catch(() => caches.match(request))
@@ -36,7 +43,5 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(request).then((hit) => hit || fetch(request))
-  );
+  event.respondWith(caches.match(request).then((hit) => hit || fetch(request)));
 });
