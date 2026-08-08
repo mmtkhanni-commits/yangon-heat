@@ -626,6 +626,7 @@ async function toggleRecording() {
       const blob = new Blob(chunks, { type: 'audio/webm' });
       const form = new FormData();
       form.append('audio', blob, 'question.webm');
+      form.append('lang', state.lang);   // auto-detect misreads Burmese as Chinese
 
       try {
         const response = await fetch(`${API}/api/transcribe`, { method: 'POST', body: form });
@@ -635,7 +636,11 @@ async function toggleRecording() {
         }
         const { text } = await response.json();
         if (text) {
-          sendChat(text);
+          // put it in the box first — Burmese transcription is imperfect, so
+          // the reader gets a chance to correct it before it is sent
+          $('chatInput').value = text;
+          $('chatInput').focus();
+          toast(say('စစ်ဆေးပြီး ↑ ကို နှိပ်ပါ။', 'Check it, then tap ↑ to send.'));
         } else {
           toast(say('စကားသံ မကြားရပါ။', 'Nothing was picked up.'));
         }

@@ -256,8 +256,12 @@ GROQ_TRANSCRIBE_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
 
 @app.post("/api/transcribe")
-async def transcribe(audio: UploadFile = File(...)):
-    """Speech to text, so people can ask by voice instead of typing Burmese."""
+async def transcribe(audio: UploadFile = File(...), lang: str = Form(default="my")):
+    """Speech to text, so people can ask by voice instead of typing Burmese.
+
+    The language is passed explicitly. Left to auto-detect, Whisper regularly
+    reads Burmese as Chinese and returns Han characters.
+    """
     key = os.environ.get("GROQ_API_KEY", "").strip()
     if not key:
         raise HTTPException(503, "Voice input needs GROQ_API_KEY on the server.")
@@ -273,7 +277,9 @@ async def transcribe(audio: UploadFile = File(...)):
                 headers={"Authorization": f"Bearer {key}"},
                 files={"file": (audio.filename or "clip.webm", data,
                                 audio.content_type or "audio/webm")},
-                data={"model": "whisper-large-v3"})
+                data={"model": "whisper-large-v3",
+                      "language": "my" if lang == "my" else "en",
+                      "temperature": "0"})
         response.raise_for_status()
         return {"text": response.json().get("text", "").strip()}
     except httpx.HTTPStatusError as exc:
