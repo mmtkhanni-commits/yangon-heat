@@ -10,8 +10,10 @@ from __future__ import annotations
 import difflib
 import json
 import math
+import os
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -335,17 +337,25 @@ _live_lock = threading.Lock()
 FETCH_INTERVAL = timedelta(hours=1)
 
 
-def _get_with_retry(client, url, params, attempts=3):
+def _get_with_retry(client, url, params, attempts=6):
     """Open-Meteo occasionally answers 429 when several requests land close
     together - a cold Render instance plus several visitors arriving at once
-    is enough to trigger it. Back off and retry rather than failing the whole
-    /api/live call over a transient rate limit."""
+    is enough to trigger it. A block can outlast a few seconds of backoff, so
+    this waits up to roughly two minutes across six attempts before giving up
+    - still well inside what a background fetch can afford to spend."""
     last_error = None
     for attempt in range(attempts):
         response = client.get(url, params=params)
         if response.status_code == 429:
-            last_error = RuntimeError("rate limited (429)")
-            time.sleep(1.5 * (2 ** attempt))
+            wait = min(2 * (2 ** attempt), 40)   # 2, 4, 8, 16, 32, 40s - capped
+            retry_after = response.headers.get("Retry-After")
+            if retry_after:
+                try:
+                    wait = max(wait, float(retry_after))
+                except ValueError:
+                    pass
+            last_error = RuntimeError(f"rate limited (429), waited up to {wait:.0f}s total so far")
+            time.sleep(wait)
             continue
         response.raise_for_status()
         return response
@@ -353,56 +363,216 @@ def _get_with_retry(client, url, params, attempts=3):
 
 
 def _parse_ts(value):
-    dt = datetime.fromisoformat(value)
+    """Postgres returns TIMESTAMPTZ columns as native datetime objects, while
+    SQLite (TEXT columns) returns plain strings - accept either rather than
+    assuming one, which is what crashed this in production."""
+    dt = value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
-def fetch_live():
-    """Current temperature and air quality for every township, refetched from
-    Open-Meteo at most once per hour.
+def _ts_to_str(value):
+    """The inverse: always hand the API a string, whichever type storage gave us."""
+    return value.isoformat() if isinstance(value, datetime) else str(value)
 
-    The previous version cached to a local file, which Render's free tier
-    wipes every time the instance spins down from inactivity and restarts -
-    a very ordinary thing to happen overnight. Every restart meant a fresh
-    full fetch, and enough visitors arriving close together during one of
-    those windows was what triggered the 429s. The cache now lives in
-    Postgres, which survives restarts and deploys, so the hourly gate holds
-    even when the server itself does not.
+
+# =========================================================
+# FALLBACK PROVIDER — OpenWeatherMap
+# =========================================================
+# Open-Meteo needs no key, which is exactly why a block affects everyone
+# sharing the host's outbound IP rather than just this app. OpenWeatherMap
+# rate-limits per account key instead, so it is unaffected by that and is
+# used only when Open-Meteo is unreachable - never as the everyday source,
+# since Open-Meteo's per-township detail (UV, precipitation) is better.
+OWM_WEATHER_URL = "https://api.openweathermap.org/data/2.5/weather"
+OWM_AIR_URL = "https://api.openweathermap.org/data/2.5/air_pollution"
+
+# EPA's published PM2.5 24-hour breakpoints, used only to derive a comparable
+# US AQI figure when the fallback provider does not supply its own - OpenWeatherMap's
+# native 1-5 index is a different scale and would be misleading if shown
+# as though it were the same number Open-Meteo returns.
+_PM25_BREAKPOINTS = [
+    (0.0, 12.0, 0, 50), (12.1, 35.4, 51, 100), (35.5, 55.4, 101, 150),
+    (55.5, 150.4, 151, 200), (150.5, 250.4, 201, 300),
+    (250.5, 350.4, 301, 400), (350.5, 500.4, 401, 500),
+]
+
+
+def pm25_to_us_aqi(pm25):
+    if pm25 is None:
+        return None
+    pm25 = max(0.0, min(pm25, 500.4))
+    for c_lo, c_hi, a_lo, a_hi in _PM25_BREAKPOINTS:
+        if c_lo <= pm25 <= c_hi:
+            return round((a_hi - a_lo) / (c_hi - c_lo) * (pm25 - c_lo) + a_lo)
+    return 500
+
+
+def _owm_key():
+    return os.environ.get("OWM_API_KEY", "").strip()
+
+
+def _fetch_owm_township(client, key, township):
+    lat, lon = township["coords"]
+    weather = client.get(OWM_WEATHER_URL,
+                         params={"lat": lat, "lon": lon, "appid": key, "units": "metric"})
+    weather.raise_for_status()
+    w = weather.json()
+
+    pm25 = None
+    try:
+        air = client.get(OWM_AIR_URL, params={"lat": lat, "lon": lon, "appid": key})
+        air.raise_for_status()
+        pm25 = air.json().get("list", [{}])[0].get("components", {}).get("pm2_5")
+    except Exception:
+        pass   # temperature still matters even without an air reading
+
+    main = w.get("main", {})
+    wind = w.get("wind", {})
+    temp = main.get("temp")
+    aqi_value = pm25_to_us_aqi(pm25) or 0
+
+    return {
+        "name": township["name"], "name_my": township.get("name_my", township["name"]),
+        "coords": township["coords"],
+        "temp": round(temp, 1) if temp is not None else None,
+        "feels_like": main.get("feels_like"),
+        "humidity": main.get("humidity"),
+        "wind": round(wind["speed"] * 3.6, 1) if wind.get("speed") is not None else None,
+        "uv": None, "uv_band": "unknown",   # not available on this tier
+        "is_day": None, "rain": None,
+        "aqi": aqi_value, "aqi_band": aqi_band(aqi_value),
+        "pm25": round(pm25, 1) if pm25 is not None else None,
+        "pm25_band": pm25_band(pm25),
+    }
+
+
+def _fetch_openweathermap_all(townships):
+    """One HTTP pair per township (no bulk endpoint on the free tier), paced
+    in batches to stay under OpenWeatherMap's 60 calls/minute limit."""
+    key = _owm_key()
+    if not key:
+        raise RuntimeError("OWM_API_KEY is not set")
+
+    results = []
+    batch_size = 15   # 2 requests/township x 15 = 30 calls/batch, well under 60/min
+    with httpx.Client(timeout=15) as client:
+        for start in range(0, len(townships), batch_size):
+            batch = townships[start:start + batch_size]
+            with ThreadPoolExecutor(max_workers=batch_size) as pool:
+                futures = [pool.submit(_fetch_owm_township, client, key, t) for t in batch]
+                for future in futures:
+                    try:
+                        results.append(future.result())
+                    except Exception:
+                        continue   # one township failing should not sink the whole fetch
+            if start + batch_size < len(townships):
+                time.sleep(20)
+
+    temps = [r["temp"] for r in results if r["temp"] is not None]
+    if not temps:
+        raise RuntimeError("OpenWeatherMap returned no usable readings")
+    city_mean = sum(temps) / len(temps)
+
+    out = []
+    for r in results:
+        temp = r["temp"] if r["temp"] is not None else city_mean
+        anomaly = round(temp - city_mean, 2)
+        band, level = classify(anomaly)
+        vuln = 50 + anomaly * 18 + ((r["aqi"] or 50) - 50) * 0.30
+        r.update({
+            "temp": round(temp, 1), "anomaly": anomaly,
+            "uhi_band": band, "uhi_level": level,
+            "vulnerability": round(max(0.0, min(100.0, vuln)), 1),
+        })
+        out.append(r)
+
+    return {
+        "observed_at": datetime.now(timezone.utc).isoformat(timespec="minutes"),
+        "city_mean": round(city_mean, 2),
+        "boundary_meta": get_townships()[1],
+        "townships": sorted(out, key=lambda r: r["temp"], reverse=True),
+        "source": "openweathermap",
+    }
+
+
+def _cache_fresh(payload, next_fetch_at):
+    payload = dict(payload)
+    payload["stale"] = False
+    payload["next_fetch_at"] = _ts_to_str(next_fetch_at)
+    return payload
+
+
+def _store_and_wrap(payload):
+    fetched_at = datetime.now(timezone.utc)
+    next_fetch_at = fetched_at + FETCH_INTERVAL
+    db.save_live_cache(json.dumps(payload), fetched_at.isoformat(), next_fetch_at.isoformat())
+    return _cache_fresh(payload, next_fetch_at.isoformat())
+
+
+def _background_owm_refresh():
+    """Runs on its own thread so a visitor who is being served stale data
+    right now does not wait for this - it just makes the next request fresher."""
+    try:
+        townships, _ = get_townships()
+        _store_and_wrap(_fetch_openweathermap_all(townships))
+    except Exception:
+        pass   # the normal hourly path will simply try Open-Meteo again
+
+
+def fetch_live():
+    """Current temperature and air quality for every township, refetched at
+    most once per hour.
+
+    Open-Meteo is the primary source and needs no key, which is exactly why a
+    block on the host's shared outbound IP - not unusual on Render's free tier,
+    where many apps share the same address - affects this app the same as
+    everyone else on it. When that happens, OpenWeatherMap (keyed per account,
+    unaffected by IP-level blocks) steps in until Open-Meteo recovers.
+
+    The cache lives in Postgres rather than a local file, so it survives the
+    instance restarts Render performs after 15 minutes of inactivity - the
+    previous file-based cache was wiped on every one of those, which is what
+    turned an ordinary quiet night into a full refetch storm.
     """
     row = db.get_live_cache()
     if row and datetime.now(timezone.utc) < _parse_ts(row["next_fetch_at"]):
-        payload = json.loads(row["payload"])
-        payload["stale"] = False
-        payload["next_fetch_at"] = row["next_fetch_at"]
-        return payload
+        return _cache_fresh(json.loads(row["payload"]), row["next_fetch_at"])
 
     with _live_lock:
         # someone else may have refreshed it while this call waited for the lock
         row = db.get_live_cache()
         if row and datetime.now(timezone.utc) < _parse_ts(row["next_fetch_at"]):
-            payload = json.loads(row["payload"])
-            payload["stale"] = False
-            payload["next_fetch_at"] = row["next_fetch_at"]
-            return payload
+            return _cache_fresh(json.loads(row["payload"]), row["next_fetch_at"])
 
         try:
             payload = _fetch_live_uncached()
-            fetched_at = datetime.now(timezone.utc)
-            next_fetch_at = fetched_at + FETCH_INTERVAL
-            db.save_live_cache(json.dumps(payload), fetched_at.isoformat(),
-                               next_fetch_at.isoformat())
-            payload = dict(payload)
-            payload["stale"] = False
-            payload["next_fetch_at"] = next_fetch_at.isoformat()
-            return payload
-        except Exception:
-            # Open-Meteo itself is unreachable or still rate limiting - serve
-            # whatever was last stored rather than a 503 for every visitor
+            payload["source"] = "open-meteo"
+            return _store_and_wrap(payload)
+        except Exception as primary_error:
             if row:
+                # something is already cached: serve it immediately so this
+                # visitor is not the one waiting on a slow fallback, and try
+                # OpenWeatherMap in the background so the next visitor gets
+                # fresher data
+                if _owm_key():
+                    threading.Thread(target=_background_owm_refresh, daemon=True).start()
                 payload = json.loads(row["payload"])
                 payload["stale"] = True
                 return payload
-            raise
+
+            # nothing cached at all - this is the very first fetch this
+            # deployment has ever made, so there is no stale copy to fall
+            # back to. OpenWeatherMap is the only option left, tried now.
+            if not _owm_key():
+                raise
+            try:
+                townships, _ = get_townships()
+                payload = _fetch_openweathermap_all(townships)
+                return _store_and_wrap(payload)
+            except Exception as fallback_error:
+                raise RuntimeError(
+                    f"Open-Meteo failed ({primary_error}); OpenWeatherMap "
+                    f"fallback also failed ({fallback_error})") from fallback_error
 
 
 def _fetch_live_uncached():
