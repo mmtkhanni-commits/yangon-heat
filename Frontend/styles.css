@@ -1396,76 +1396,23 @@ footer { margin-top: 28px; }
 
 .scene .gardener {
   position: absolute;
-  bottom: 34%;
-  left: 8%;
-  width: 34px;
-  transform-origin: bottom center;
+  bottom: 33%;
+  left: 6%;
+  width: 46px;
+  height: 50px;
 }
 
-.scene .gardener .head {
-  width: 60%;
-  aspect-ratio: 1;
-  margin: 0 auto;
-  border-radius: 50%;
-  background: #F2D2B3;
-  position: relative;
-  z-index: 2;
-}
-.scene .gardener .hair {
-  position: absolute;
-  top: -2%;
-  left: 8%;
-  width: 84%;
-  height: 60%;
-  border-radius: 50% 50% 0 0;
-  background: #2E241F;
-}
-.scene .gardener .body {
-  width: 78%;
-  height: 40%;
-  margin: -6% auto 0;
-  border-radius: 40% 40% 30% 30%;
-  background: #4E9E7E;
-  position: relative;
-}
-
-/* the digging arm sweeps down and back, like turning soil with a trowel */
-.scene .gardener .arm {
-  position: absolute;
-  top: 8%;
-  right: -18%;
-  width: 42%;
-  height: 16%;
-  background: #F2D2B3;
-  border-radius: 40px;
-  transform-origin: 15% 50%;
+/* only the working arm+trowel animates — the same dig motion as before,
+   now rotating a small <g> inside the SVG instead of separate CSS boxes */
+.scene .gardener .g-arm {
+  transform-origin: 36px 34px;
   animation: dig 1.6s ease-in-out infinite;
 }
 
 @keyframes dig {
-  0%, 100% { transform: rotate(8deg); }
-  45% { transform: rotate(58deg); }
-  60% { transform: rotate(58deg); }
-}
-
-.scene .gardener .trowel {
-  position: absolute;
-  top: 4%;
-  right: -8%;
-  width: 34%;
-  height: 60%;
-  background: #8AA394;
-  border-radius: 2px 8px 8px 2px;
-  transform-origin: top left;
-  animation: dig 1.6s ease-in-out infinite;
-}
-
-.scene .gardener .legs {
-  width: 60%;
-  height: 22%;
-  margin: 0 auto;
-  background: #3d8f6d;
-  border-radius: 0 0 6px 6px;
+  0%, 100% { transform: rotate(0deg); }
+  45% { transform: rotate(38deg); }
+  60% { transform: rotate(38deg); }
 }
 
 /* the seedling the gardener is placing, appearing partway through the dig */
@@ -1511,3 +1458,18 @@ footer { margin-top: 28px; }
   opacity: 0.9;
 }
 .bar-slot.is-peak .bar-icon { filter: drop-shadow(0 0 4px rgba(227,168,87,0.5)); }
+
+/* arms wave, legs kick gently for the "comfortable" character — a bob alone
+   read as stiff/lifeless */
+@keyframes armWave { 0%,100% { transform: rotate(-8deg); } 50% { transform: rotate(14deg); } }
+@keyframes legKick { 0%,100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+
+.advice-art .arm-l { animation: armWave 1.8s ease-in-out infinite; transform-origin: 50% 0%; }
+.advice-art .arm-r { animation: armWave 1.8s ease-in-out infinite reverse; transform-origin: 50% 0%; }
+.advice-art .leg-l { animation: legKick 1.4s ease-in-out infinite; transform-origin: 50% 0%; }
+.advice-art .leg-r { animation: legKick 1.4s ease-in-out infinite reverse; transform-origin: 50% 0%; }
+
+/* rain overlay, dropped onto whichever heat-level character is showing */
+@keyframes rainFall { 0% { transform: translateY(-4px); opacity: 0; } 30% { opacity: 0.9; }
+  100% { transform: translateY(10px); opacity: 0; } }
+.advice-art .rain-drop { animation: rainFall 0.9s linear infinite; }

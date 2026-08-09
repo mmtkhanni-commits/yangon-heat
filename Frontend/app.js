@@ -299,6 +299,11 @@ const ART = {
     <circle cx="72" cy="20" r="8" fill="#E3A857" class="shimmer"/>
     <g class="bob">
       <path d="M35 78 h20 l-3 -20 h-14z" fill="#4E9E7E"/>
+      <!-- legs give a little kick, arms wave — a static bob alone read as stiff -->
+      <rect x="37" y="76" width="4" height="9" rx="2" fill="#F2D2B3" class="leg-l"/>
+      <rect x="47" y="76" width="4" height="9" rx="2" fill="#F2D2B3" class="leg-r"/>
+      <rect x="31" y="60" width="4" height="12" rx="2" fill="#F2D2B3" class="arm-l"/>
+      <rect x="53" y="60" width="4" height="12" rx="2" fill="#F2D2B3" class="arm-r"/>
       <circle cx="45" cy="44" r="13" fill="#F2D2B3"/>
       <path d="M32 42 a13 13 0 0 1 26 0 q-4 -7 -13 -7 t-13 7z" fill="#2E241F"/>
       <circle cx="40" cy="45" r="1.8" fill="#2E241F"/>
@@ -386,12 +391,32 @@ const ART = {
   </svg>`,
 };
 
-function renderAdvice(guide) {
+function rainOverlay() {
+  // a few falling drops layered over whichever heat-level character is
+  // showing, so "raining right now" reads at a glance alongside the heat
+  return `<g class="rain-overlay">
+    <line x1="20" y1="8" x2="17" y2="16" stroke="#5FB3C9" stroke-width="2"
+          stroke-linecap="round" class="rain-drop" style="animation-delay:0s"/>
+    <line x1="32" y1="4" x2="29" y2="12" stroke="#5FB3C9" stroke-width="2"
+          stroke-linecap="round" class="rain-drop" style="animation-delay:0.25s"/>
+    <line x1="66" y1="10" x2="63" y2="18" stroke="#5FB3C9" stroke-width="2"
+          stroke-linecap="round" class="rain-drop" style="animation-delay:0.5s"/>
+    <line x1="78" y1="6" x2="75" y2="14" stroke="#5FB3C9" stroke-width="2"
+          stroke-linecap="round" class="rain-drop" style="animation-delay:0.15s"/>
+  </g>`;
+}
+
+function renderAdvice(guide, rainMm) {
   const key = guide.level === 'comfortable' ? 'comfortable'
     : guide.level === 'warm' ? 'warm'
     : guide.level === 'warning' ? 'warning' : 'danger';
 
-  $('adviceArt').innerHTML = ART[key];
+  let art = ART[key];
+  if (rainMm > 0) {
+    art = art.replace('</svg>', `${rainOverlay()}</svg>`);
+  }
+
+  $('adviceArt').innerHTML = art;
   $('adviceTitle').textContent = state.lang === 'my' ? guide.headline_my : guide.headline_en;
   $('advice').textContent = state.lang === 'my' ? guide.advice_my : guide.advice_en;
   state.lastAdvice = `${$('adviceTitle').textContent}. ${$('advice').textContent}`;
@@ -920,7 +945,7 @@ function renderHero(detail) {
 
   $('temp').textContent = t.temp.toFixed(1);
   $('verdict').textContent = state.lang === 'my' ? g.headline_my : g.headline_en;
-  renderAdvice(g);
+  renderAdvice(g, t.rain);
 
   const colour = LEVEL_COLOUR[g.level] || 'var(--muted)';
   $('hero').style.borderLeftColor = colour;
@@ -1034,7 +1059,7 @@ async function loadDetail() {
       $('anomaly').textContent = row.anomaly > 0 ? `+${row.anomaly}°` : `${row.anomaly}°`;
       const g = sourcesGuidanceFallback(row);
       $('verdict').textContent = state.lang === 'my' ? g.headline_my : g.headline_en;
-      renderAdvice(g);
+      renderAdvice(g, row.rain);
     }
   }
 
@@ -1304,19 +1329,38 @@ function drawTreeScene(pct, drop, baseTemp) {
              </span>`;
   }
 
-  // the chibi gardener, always at work planting the next one — same visual
-  // language as the Today advice art (round head, F2D2B3 skin, 2E241F hair)
+  // the chibi gardener, always at work planting the next one — big head,
+  // rosy cheeks and a closed happy smile, matching the Today advice art
   html += `
     <span class="soil"></span>
     <span class="seedling">
       <span class="leaf-l"></span><span class="leaf-r"></span><span class="stem"></span>
     </span>
     <span class="gardener">
-      <span class="head"><span class="hair"></span></span>
-      <span class="body"></span>
-      <span class="trowel"></span>
-      <span class="arm"></span>
-      <span class="legs"></span>
+      <svg viewBox="0 0 60 66" width="100%" height="100%">
+        <!-- kneeling body -->
+        <path d="M18 60 q-2 -18 6 -22 q6 -3 12 0 q8 4 6 22z" fill="#4E9E7E"/>
+        <!-- working arm + trowel, swings down to the soil -->
+        <g class="g-arm">
+          <path d="M36 34 q10 2 13 10" stroke="#F2D2B3" stroke-width="6"
+                stroke-linecap="round" fill="none"/>
+          <rect x="46" y="40" width="5" height="14" rx="2" fill="#8AA394"
+                transform="rotate(35 48 47)"/>
+        </g>
+        <!-- steady hand -->
+        <circle cx="20" cy="42" r="4" fill="#F2D2B3"/>
+        <!-- big round head -->
+        <circle cx="30" cy="20" r="16" fill="#F2D2B3"/>
+        <path d="M14 19 a16 16 0 0 1 32 0 q-5 -9 -16 -9 t-16 9z" fill="#2E241F"/>
+        <path d="M25 22 q2 2 4 0" stroke="#2E241F" stroke-width="1.8"
+              fill="none" stroke-linecap="round"/>
+        <path d="M33 22 q2 2 4 0" stroke="#2E241F" stroke-width="1.8"
+              fill="none" stroke-linecap="round"/>
+        <path d="M26 27 q4 3 8 0" stroke="#2E241F" stroke-width="1.6"
+              fill="none" stroke-linecap="round"/>
+        <circle cx="21" cy="25" r="3" fill="#E89A9A" opacity="0.65"/>
+        <circle cx="39" cy="25" r="3" fill="#E89A9A" opacity="0.65"/>
+      </svg>
     </span>`;
 
   // birds arrive once there is a canopy worth living in
