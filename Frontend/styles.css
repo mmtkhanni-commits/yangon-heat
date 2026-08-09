@@ -216,7 +216,8 @@ section { margin-top: 22px; scroll-margin-top: 74px; }
   min-width: 0;
 }
 .chips dt { font-size: 10.5px; color: var(--muted); font-family: var(--burmese); line-height: 1.35; }
-.chips dd { margin: 3px 0 0; font-family: var(--mono); font-size: 15px; font-weight: 600; }
+.chips dd { margin: 3px 0 0; font-family: var(--mono); font-size: 15px; font-weight: 600; display: flex; flex-direction: column; gap: 2px; }
+.chip-note { font-family: var(--burmese); font-size: 10px; font-weight: 400; color: var(--muted); line-height: 1.3; }
 
 /* --------------------------------------------------- signature: the ribbon */
 
@@ -901,15 +902,16 @@ h3.sub { font-size: 13.5px; margin: 18px 0 8px; color: var(--text); font-family:
   border-radius: 12px;
   overflow: hidden;
   margin-bottom: 14px;
-  background: linear-gradient(180deg, #24344a 0%, #33475f 62%, #3d4a3a 62%, #2f3a2c 100%);
+  /* a clear daytime sky — the earlier dusk-toned blues read as evening */
+  background: linear-gradient(180deg, #5FA8D3 0%, #BFE0F0 60%, #4a6b3f 60%, #34502c 100%);
   transition: filter 0.6s ease;
 }
 
 .scene .sun {
-  position: absolute; top: 14px; right: 22px;
-  width: 30px; height: 30px; border-radius: 50%;
-  background: var(--thanaka);
-  box-shadow: 0 0 24px 8px rgba(227, 168, 87, 0.45);
+  position: absolute; top: 12px; right: 22px;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: #FFC94A;
+  box-shadow: 0 0 28px 10px rgba(255, 201, 74, 0.55);
   transition: background 0.6s ease, box-shadow 0.6s ease;
 }
 
@@ -923,8 +925,8 @@ h3.sub { font-size: 13.5px; margin: 18px 0 8px; color: var(--text); font-family:
 
 .scene .building {
   position: absolute; bottom: 38%;
-  background: #1b2430;
-  border-top: 2px solid #2b3644;
+  background: #7C8A93;
+  border-top: 2px solid #94A0A8;
 }
 
 /* a chibi tree: round canopy, short trunk, planted with a small bounce */
@@ -1461,13 +1463,8 @@ footer { margin-top: 28px; }
 
 /* arms wave, legs kick gently for the "comfortable" character — a bob alone
    read as stiff/lifeless */
-@keyframes armWave { 0%,100% { transform: rotate(-8deg); } 50% { transform: rotate(14deg); } }
-@keyframes legKick { 0%,100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
-
-.advice-art .arm-l { animation: armWave 1.8s ease-in-out infinite; transform-origin: 50% 0%; }
-.advice-art .arm-r { animation: armWave 1.8s ease-in-out infinite reverse; transform-origin: 50% 0%; }
-.advice-art .leg-l { animation: legKick 1.4s ease-in-out infinite; transform-origin: 50% 0%; }
-.advice-art .leg-r { animation: legKick 1.4s ease-in-out infinite reverse; transform-origin: 50% 0%; }
+/* arms/legs stay still for "comfortable" — the body's own gentle .bob is
+   enough to feel alive without reading as fidgety */
 
 /* rain overlay, dropped onto whichever heat-level character is showing */
 @keyframes rainFall { 0% { transform: translateY(-4px); opacity: 0; } 30% { opacity: 0.9; }

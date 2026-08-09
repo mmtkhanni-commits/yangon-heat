@@ -939,6 +939,29 @@ function renderRibbon() {
   renderMap();
 }
 
+// Plain-language captions so a bare "+0.4°" or "32°" does not need
+// interpreting - the chip says in words what the number means.
+function feelsCaption(temp, feelsLike) {
+  // Every phrase here is copied verbatim from text already verified
+  // elsewhere in this file, to avoid hand-typing new Burmese that could
+  // come out wrong the way an earlier attempt at this did.
+  if (feelsLike == null) return { value: '—', note: '' };
+  const diff = feelsLike - temp;
+  const value = `${feelsLike.toFixed(1)}°`;
+  if (diff >= 2) return { value, note: say('ပိုပူသလို ခံစားရမည်', 'feels hotter than the air temperature') };
+  if (diff <= -2) return { value, note: say('', 'feels cooler than the air temperature') };
+  return { value, note: '' };
+}
+
+function anomalyCaption(anomaly) {
+  // Arrows carry the "hotter/cooler than the city" meaning without needing
+  // any new Burmese words at all — the dt label above already says
+  // "vs city average", so the arrow just makes the direction unmistakable.
+  const value = anomaly > 0 ? `+${anomaly}°` : `${anomaly}°`;
+  const arrow = anomaly >= 0.3 ? '▲' : anomaly <= -0.3 ? '▼' : '';
+  return { value: arrow ? `${arrow} ${value}` : value, note: '' };
+}
+
 function renderHero(detail) {
   const t = detail.township;
   const g = detail.guidance;
@@ -951,9 +974,13 @@ function renderHero(detail) {
   $('hero').style.borderLeftColor = colour;
   $('verdict').style.color = colour;
 
-  $('feels').textContent = t.feels_like != null ? `${t.feels_like.toFixed(1)}°` : '—';
+  const feelsC = feelsCaption(t.temp, t.feels_like);
+  $('feels').textContent = feelsC.value;
+  $('feelsNote').textContent = feelsC.note;
   $('aqi').textContent = t.aqi ? t.aqi : '—';
-  $('anomaly').textContent = t.anomaly > 0 ? `+${t.anomaly}°` : `${t.anomaly}°`;
+  const anomC = anomalyCaption(t.anomaly);
+  $('anomaly').textContent = anomC.value;
+  $('anomalyNote').textContent = anomC.note;
 
   const stamp = detail.observed_at
     ? detail.observed_at.replace('T', ' ')
@@ -1054,9 +1081,13 @@ async function loadDetail() {
     const row = state.live && state.live.townships.find((r) => r.name === state.township);
     if (row) {
       $('temp').textContent = row.temp.toFixed(1);
-      $('feels').textContent = row.feels_like != null ? `${row.feels_like.toFixed(1)}°` : '—';
+      const feelsC2 = feelsCaption(row.temp, row.feels_like);
+      $('feels').textContent = feelsC2.value;
+      $('feelsNote').textContent = feelsC2.note;
       $('aqi').textContent = row.aqi ? row.aqi : '—';
-      $('anomaly').textContent = row.anomaly > 0 ? `+${row.anomaly}°` : `${row.anomaly}°`;
+      const anomC2 = anomalyCaption(row.anomaly);
+      $('anomaly').textContent = anomC2.value;
+      $('anomalyNote').textContent = anomC2.note;
       const g = sourcesGuidanceFallback(row);
       $('verdict').textContent = state.lang === 'my' ? g.headline_my : g.headline_en;
       renderAdvice(g, row.rain);
