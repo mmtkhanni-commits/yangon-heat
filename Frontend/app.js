@@ -82,6 +82,41 @@ function say(my, en) {
 
 const RAMP = ['#3D7EA6', '#4E9E7E', '#E3A857', '#C9502F', '#A31E1E'];
 
+// Small glyphs for the forecast bars — sun for clear day hours, a moon for
+// night, a raincloud when the rain chance crosses 40%. Plain shapes, no
+// external images, themed with the same palette as the rest of the page.
+function weatherIcon(kind) {
+  if (kind === 'rain') {
+    return `<svg viewBox="0 0 24 24" width="18" height="18">
+      <path d="M6 12a5 5 0 0 1 9.6-1.9A4 4 0 0 1 17 18H7a4 4 0 0 1-1-7.9z"
+            fill="#8AA394"/>
+      <g stroke="#5FB3C9" stroke-width="1.6" stroke-linecap="round">
+        <line x1="8" y1="19" x2="7" y2="22"/>
+        <line x1="12" y1="19" x2="11" y2="22"/>
+        <line x1="16" y1="19" x2="15" y2="22"/>
+      </g>
+    </svg>`;
+  }
+  if (kind === 'moon') {
+    return `<svg viewBox="0 0 24 24" width="18" height="18">
+      <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" fill="#B7E4C7"/>
+    </svg>`;
+  }
+  return `<svg viewBox="0 0 24 24" width="18" height="18">
+    <circle cx="12" cy="12" r="5.5" fill="#E3A857"/>
+    <g stroke="#E3A857" stroke-width="1.8" stroke-linecap="round">
+      <line x1="12" y1="1.5" x2="12" y2="4.5"/>
+      <line x1="12" y1="19.5" x2="12" y2="22.5"/>
+      <line x1="1.5" y1="12" x2="4.5" y2="12"/>
+      <line x1="19.5" y1="12" x2="22.5" y2="12"/>
+      <line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/>
+      <line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/>
+      <line x1="19.8" y1="4.2" x2="17.7" y2="6.3"/>
+      <line x1="6.3" y1="17.7" x2="4.2" y2="19.8"/>
+    </g>
+  </svg>`;
+}
+
 function tempColour(temp, lo, hi) {
   const span = Math.max(hi - lo, 0.1);
   const idx = Math.min(Math.floor(((temp - lo) / span) * RAMP.length), RAMP.length - 1);
@@ -920,7 +955,8 @@ function renderSpark(hours) {
   // A line chart with axis numbers reads well to someone used to graphs, but
   // "what will it feel like around lunchtime" is the actual question, so this
   // shows a handful of named time slots instead: today's readers scan it in
-  // one pass rather than decoding a plot.
+  // one pass rather than decoding a plot. Small icons above each bar say
+  // "rain" or "day/night" at a glance, before the numbers are even read.
   const box = $('forecastBars');
   if (!hours.length) { box.innerHTML = ''; return; }
 
@@ -962,8 +998,12 @@ function renderSpark(hours) {
     const isPeak = p.temp === peakTemp;
     const rainNote = p.rain_chance >= 50
       ? `<span class="bar-rain">☔ ${p.rain_chance}%</span>` : '';
+    const hour = p.dt.getHours();
+    const icon = p.rain_chance >= 40 ? weatherIcon('rain')
+      : (hour >= 6 && hour < 18) ? weatherIcon('sun') : weatherIcon('moon');
     return `
       <div class="bar-slot${isPeak ? ' is-peak' : ''}">
+        <span class="bar-icon">${icon}</span>
         <span class="bar-temp">${p.temp}°</span>
         ${rainNote}
         <span class="bar-col" style="height:${heightPct}%;background:${colour}"></span>

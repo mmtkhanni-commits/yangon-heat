@@ -1505,3 +1505,9 @@ footer { margin-top: 28px; }
   border-radius: 50%;
   opacity: 0.7;
 }
+
+.bar-icon {
+  display: block;
+  opacity: 0.9;
+}
+.bar-slot.is-peak .bar-icon { filter: drop-shadow(0 0 4px rgba(227,168,87,0.5)); }
