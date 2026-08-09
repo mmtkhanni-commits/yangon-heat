@@ -54,6 +54,13 @@ def _q(sql):
 
 
 SCHEMA_PG = [
+    """CREATE TABLE IF NOT EXISTS forecast_cache (
+        id SMALLINT PRIMARY KEY DEFAULT 1,
+        payload TEXT NOT NULL,
+        fetched_at TIMESTAMPTZ NOT NULL,
+        next_fetch_at TIMESTAMPTZ NOT NULL,
+        CHECK (id = 1)
+    )""",
     """CREATE TABLE IF NOT EXISTS live_cache (
         id SMALLINT PRIMARY KEY DEFAULT 1,
         payload TEXT NOT NULL,
@@ -90,6 +97,12 @@ SCHEMA_PG = [
 ]
 
 SCHEMA_SQLITE = [
+    """CREATE TABLE IF NOT EXISTS forecast_cache (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        payload TEXT NOT NULL,
+        fetched_at TEXT NOT NULL,
+        next_fetch_at TEXT NOT NULL
+    )""",
     """CREATE TABLE IF NOT EXISTS live_cache (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         payload TEXT NOT NULL,
@@ -212,6 +225,38 @@ def mark_sent(sub_id):
             cur.execute("UPDATE subscriptions SET last_sent = NOW() WHERE id = %s", (sub_id,))
         else:
             cur.execute("UPDATE subscriptions SET last_sent = ? WHERE id = ?", (_now(), sub_id))
+
+
+# ------------------------------------------------------------ forecast cache
+# Same shape as live_cache below - one shared row holding the batched
+# 48-hour forecast for all 44 townships, so viewing several townships in one
+# session does not multiply into separate Open-Meteo calls.
+
+def get_forecast_cache():
+    with connection() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT payload, fetched_at, next_fetch_at FROM forecast_cache WHERE id = 1")
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+
+def save_forecast_cache(payload_json, fetched_at, next_fetch_at):
+    with connection() as conn:
+        cur = conn.cursor()
+        if IS_POSTGRES:
+            cur.execute(
+                "INSERT INTO forecast_cache (id, payload, fetched_at, next_fetch_at) "
+                "VALUES (1, %s, %s, %s) ON CONFLICT (id) DO UPDATE SET "
+                "payload = EXCLUDED.payload, fetched_at = EXCLUDED.fetched_at, "
+                "next_fetch_at = EXCLUDED.next_fetch_at",
+                (payload_json, fetched_at, next_fetch_at))
+        else:
+            cur.execute(
+                "INSERT INTO forecast_cache (id, payload, fetched_at, next_fetch_at) "
+                "VALUES (1, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET "
+                "payload = excluded.payload, fetched_at = excluded.fetched_at, "
+                "next_fetch_at = excluded.next_fetch_at",
+                (payload_json, fetched_at, next_fetch_at))
 
 
 # ---------------------------------------------------------------- live cache

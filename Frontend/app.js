@@ -510,6 +510,11 @@ async function renderMap() {
   const map = await ensureMap();
   if (!map) return;
 
+  if (!state.live) {
+    toast(say('အချက်အလက် တင်နေဆဲ — ခဏစောင့်ပါ။', 'Still loading — one moment.'));
+    return;
+  }
+
   const rows = state.live.townships;
   const temps = rows.map((r) => r.temp);
   const lo = Math.min(...temps);
@@ -775,7 +780,7 @@ function safely(name, fn) {
   }
 }
 
-function showView(name) {
+async function showView(name) {
   document.querySelectorAll('.view').forEach((view) => {
     view.classList.toggle('is-active', view.id === `view-${name}`);
   });
@@ -790,6 +795,14 @@ function showView(name) {
 
   closeDrawer();
   window.scrollTo({ top: 0, behavior: 'instant' });
+
+  // The initial /api/live call can still be in flight (or can have failed on
+  // a cold Render start) when someone taps a tab — retry once here instead
+  // of leaving every other tab stuck on "still loading" forever.
+  const needsLive = ['map', 'air', 'compare'].includes(name);
+  if (needsLive && !state.live) {
+    try { await loadLive(); } catch (_) { /* the view's own guard message covers this */ }
+  }
 
   // Leaflet measures its container on creation; a hidden one measures as zero
   if (name === 'map' && mapState.map) {
@@ -1223,6 +1236,11 @@ const TILE_ART = {
 };
 
 function renderEnvTiles() {
+  if (!state.live) {
+    $('envTiles').innerHTML = `<p class="note">${
+      say('အချက်အလက် တင်နေဆဲ — ခဏစောင့်ပါ။', 'Still loading — one moment.')}</p>`;
+    return;
+  }
   const mine = state.live.townships.find((r) => r.name === state.township);
   if (!mine) return;
 
@@ -1433,6 +1451,11 @@ function drawTreeScene(pct, drop, baseTemp) {
 /* -------------------------------------------------------------- comparison */
 
 function fillCompare() {
+  if (!state.live) {
+    $('cmpResult').innerHTML = `<p class="note">${
+      say('အချက်အလက် တင်နေဆဲ — ခဏစောင့်ပါ။', 'Still loading — one moment.')}</p>`;
+    return;
+  }
   const rows = [...state.live.townships].sort((a, b) => a.name.localeCompare(b.name));
   const options = rows.map((r) => `<option value="${r.name}">${label(r)}</option>`).join('');
 

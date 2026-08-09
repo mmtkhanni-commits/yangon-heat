@@ -655,20 +655,103 @@ def _fetch_live_uncached():
     return payload
 
 
+FORECAST_INTERVAL = timedelta(hours=1)
+_forecast_lock = threading.Lock()
+
+
+def _fetch_all_forecasts_uncached():
+    """One batched call for every township's 48-hour outlook, the same
+    multi-location technique fetch_live() uses - fetching each township
+    separately on first view was what let their combined request volume
+    cross Open-Meteo's rate limit."""
+    townships, _ = get_townships()
+    lats = ",".join(f"{t['coords'][0]:.4f}" for t in townships)
+    lons = ",".join(f"{t['coords'][1]:.4f}" for t in townships)
+
+    with httpx.Client(timeout=30) as client:
+        response = _get_with_retry(client, WEATHER_URL, {
+            "latitude": lats, "longitude": lons,
+            "hourly": "temperature_2m,apparent_temperature,precipitation_probability",
+            "forecast_days": 3, "timezone": "Asia/Yangon",
+        })
+    rows = _as_list(response.json())
+
+    by_name = {}
+    for township, row in zip(townships, rows):
+        hourly = row.get("hourly", {})
+        points = []
+        for i, stamp in enumerate(hourly.get("time", [])):
+            points.append({
+                "time": stamp,
+                "temp": hourly["temperature_2m"][i],
+                "feels_like": hourly["apparent_temperature"][i],
+                "rain_chance": hourly["precipitation_probability"][i],
+            })
+        by_name[township["name"]] = {"hours": points[:72]}
+    return by_name
+
+
+def _find_township_name(lat, lon, tolerance=0.01):
+    townships, _ = get_townships()
+    for t in townships:
+        if abs(t["coords"][0] - lat) < tolerance and abs(t["coords"][1] - lon) < tolerance:
+            return t["name"]
+    return None
+
+
 def fetch_forecast(lat, lon):
-    """48-hour outlook for one point."""
+    """48-hour outlook for one point.
+
+    For any of the 44 known townships this shares one Postgres-cached batch
+    fetch across all of them, refreshed at most once an hour - the same fix
+    already applied to /api/live. A point that is not one of the 44 still
+    gets its own direct, individually-cached fetch.
+    """
+    name = _find_township_name(lat, lon)
+
+    if name:
+        row = db.get_forecast_cache()
+        if row and datetime.now(timezone.utc) < _parse_ts(row["next_fetch_at"]):
+            by_name = json.loads(row["payload"])
+            if name in by_name:
+                return by_name[name]
+
+        with _forecast_lock:
+            row = db.get_forecast_cache()
+            if row and datetime.now(timezone.utc) < _parse_ts(row["next_fetch_at"]):
+                by_name = json.loads(row["payload"])
+                if name in by_name:
+                    return by_name[name]
+
+            try:
+                by_name = _fetch_all_forecasts_uncached()
+                fetched_at = datetime.now(timezone.utc)
+                next_fetch_at = fetched_at + FORECAST_INTERVAL
+                db.save_forecast_cache(json.dumps(by_name), fetched_at.isoformat(),
+                                       next_fetch_at.isoformat())
+                if name in by_name:
+                    return by_name[name]
+            except Exception:
+                # Open-Meteo unreachable or still rate limited - an hour-old
+                # forecast beats a 503 for every visitor
+                if row:
+                    by_name = json.loads(row["payload"])
+                    if name in by_name:
+                        return by_name[name]
+                raise
+
+    # not one of the 44 known townships - fetch this point on its own
     key = f"forecast_{lat:.3f}_{lon:.3f}.json"
     cached = _read_cache(key, max_age_seconds=3600)
     if cached:
         return cached
 
     with httpx.Client(timeout=30) as client:
-        resp = client.get(WEATHER_URL, params={
+        resp = _get_with_retry(client, WEATHER_URL, {
             "latitude": lat, "longitude": lon,
             "hourly": "temperature_2m,apparent_temperature,precipitation_probability",
             "forecast_days": 3, "timezone": "Asia/Yangon",
         })
-    resp.raise_for_status()
     hourly = resp.json().get("hourly", {})
     points = []
     for i, stamp in enumerate(hourly.get("time", [])):
