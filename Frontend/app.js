@@ -377,6 +377,10 @@ const mapState = {
   bases: {},
 };
 
+// Referenced by satOverlays() and applyLanguage() but never declared —
+// the map crashed as soon as either touched it.
+let satLayers = { lst: null, ndvi: null };
+
 async function ensureMap() {
   if (mapState.map || typeof L === 'undefined') return mapState.map;
 
@@ -523,6 +527,71 @@ function satOverlays() {
   return out;
 }
 
+/* --------------------------------------------------------------- satellite */
+
+// Wired to #lstToggle/#ndviToggle via setupSatellite() below — called from
+// startup, but the function itself had never actually been written, so the
+// checkboxes existed with no listener behind them.
+async function toggleSatLayer(kind, checked) {
+  const note = $('satNote');
+  if (!mapState.map) return;   // the map view has not been opened yet
+
+  if (!checked) {
+    if (satLayers[kind]) {
+      mapState.map.removeLayer(satLayers[kind]);
+      satLayers[kind] = null;
+    }
+    if (note) note.textContent = '';
+    return;
+  }
+
+  if (note) note.textContent = say('ဂြိုဟ်တုပုံ ဆွဲနေသည်…', 'Loading satellite imagery…');
+
+  try {
+    const layer = await api(`/api/satellite/${kind}`);
+    const tile = L.tileLayer(layer.tile_url, { opacity: 0.65, maxZoom: 19 });
+    satLayers[kind] = tile;
+    tile.addTo(mapState.map);
+
+    const shape = layer.clipped_to ? ` · ${layer.clipped_to}` : '';
+    if (note) {
+      note.textContent = kind === 'lst'
+        ? say(`ပုံ ${layer.scenes} ပုံ · နောက်ဆုံး ${layer.latest_pass} · ${layer.min}–${layer.max}°C${shape}`,
+              `${layer.scenes} scenes · latest ${layer.latest_pass} · ${layer.min}–${layer.max}°C${shape}`)
+        : say(`ပုံ ${layer.scenes} ပုံမှ ပေါင်းစပ်ထား${shape}`,
+              `Composite of ${layer.scenes} scenes${shape}`);
+    }
+  } catch (error) {
+    const toggle = $(`${kind}Toggle`);
+    if (toggle) toggle.checked = false;
+    const msg = String(error.message || '');
+    if (note) {
+      note.textContent = msg.includes('404')
+        ? say('ဤကာလအတွင်း တိမ်ကင်းသော ဂြိုဟ်တုပုံ မရှိပါ။', 'No cloud-free scenes in this window.')
+        : say('ဂြိုဟ်တုပုံ ရယူ၍ မရပါ။ Earth Engine ဆက်တင် စစ်ပါ။',
+              'Could not load satellite imagery. Check the Earth Engine setup.');
+    }
+  }
+}
+
+async function setupSatellite() {
+  const controls = $('satControls');
+  if (!controls) return;
+
+  let status;
+  try {
+    status = await api('/api/satellite/status');
+  } catch (_) {
+    status = { ready: false };
+  }
+
+  controls.hidden = !status.ready;
+  if (!status.ready) return;
+
+  $('lstToggle').addEventListener('change', (e) => toggleSatLayer('lst', e.target.checked));
+  $('ndviToggle').addEventListener('change', (e) => toggleSatLayer('ndvi', e.target.checked));
+}
+
 function focusSelected(map) {
   // downtown townships are tiny next to Taikkyi or Hlegu, so framing the whole
   // region hides most of them
@@ -666,8 +735,8 @@ function showView(name) {
   if (name === 'map' && mapState.map) {
     setTimeout(() => mapState.map.invalidateSize(), 60);
   }
-  if (name === 'map') safely('map', renderMap);
-  if (name === 'air') safely('environment', renderAir);
+  if (name === 'map') safely('map', () => renderMap());
+  if (name === 'air') safely('environment', () => renderAir());
   if (name === 'compare') safely('insights', () => { fillCompare(); renderHistory(); });
 }
 
@@ -1700,12 +1769,12 @@ async function start() {
     || (valid(state.township) && state.township)
     || state.live.townships[0].name;
 
-  safely('township list', fillTownshipPicker);
-  safely('comparison', fillCompare);
-  safely('city ribbon', renderRibbon);
-  safely('tree scene', renderGreening);
-  safely('satellite', setupSatellite);
-  safely('alerts', checkThreshold);
+  safely('township list', () => fillTownshipPicker());
+  safely('comparison', () => fillCompare());
+  safely('city ribbon', () => renderRibbon());
+  safely('tree scene', () => renderGreening());
+  safely('satellite', () => setupSatellite());
+  safely('alerts', () => checkThreshold());
 
   $('alertStatus').textContent = say(
     'အီးမေးလ် သတိပေးချက်များကို နာရီတိုင်း စစ်ဆေးပြီး ပို့ပါသည်။ ဆာဗာတွင် အီးမေးလ် အချက်အလက် မထည့်ရသေးပါက မှတ်ပုံတင်ထားသော်လည်း စာမပို့နိုင်သေးပါ။',
