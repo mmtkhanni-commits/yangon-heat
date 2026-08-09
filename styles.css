@@ -936,18 +936,7 @@ h3.sub { font-size: 13.5px; margin: 18px 0 8px; color: var(--text); font-family:
   transform-origin: bottom center;
   animation: plant 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
-.scene .tree .canopy {
-  width: 100%; aspect-ratio: 1;
-  border-radius: 52% 48% 50% 50%;
-  background: radial-gradient(circle at 35% 30%, #6fc0a3, #3d8f6d 70%);
-  box-shadow: inset -3px -4px 0 rgba(0,0,0,0.16);
-}
-.scene .tree .trunk {
-  width: 22%; height: 42%;
-  margin: -8% auto 0;
-  background: #6b4b32;
-  border-radius: 0 0 2px 2px;
-}
+/* .tree is now an inline SVG (treeSVG()), sized by its own viewBox */
 
 @keyframes plant {
   0% { transform: translateY(14px) scale(0.1); opacity: 0; }
@@ -974,12 +963,6 @@ h3.sub { font-size: 13.5px; margin: 18px 0 8px; color: var(--text); font-family:
 @keyframes fly {
   0%, 100% { transform: translate(0, 0); }
   50% { transform: translate(16px, -7px); }
-}
-
-/* rounder, friendlier canopies */
-.scene .tree .canopy {
-  border-radius: 60% 60% 44% 44%;
-  box-shadow: inset -3px -5px 0 rgba(0,0,0,0.14), 0 2px 4px rgba(0,0,0,0.25);
 }
 
 .scene .drop {
@@ -1436,7 +1419,7 @@ footer { margin-top: 28px; }
 }
 .scene .seedling .leaf-l { left: -30%; transform: rotate(-20deg); }
 .scene .seedling .leaf-r { right: -30%; transform: rotate(20deg) scaleX(-1); border-radius: 0 100% 0 100%; }
-.scene .seedling .stem { width: 10%; height: 32%; margin: 0 auto; background: #4E9E7E; }
+.scene .seedling .stem { display: block; width: 10%; height: 32%; margin: 0 auto; background: #4E9E7E; }
 
 @keyframes seedlingIn {
   0%, 40% { transform: translateY(6px) scale(0.7); opacity: 0.5; }

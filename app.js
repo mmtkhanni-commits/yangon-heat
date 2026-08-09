@@ -1330,6 +1330,21 @@ function aqiWords(band) {
 
 /* ---------------------------------------------------------------- greening */
 
+function treeSVG() {
+  // A single flat circle reads as an abstract dot, not a tree — three
+  // overlapping leaf clusters at different shades gives the fuller, uneven
+  // silhouette that actually looks like foliage.
+  return `<svg viewBox="0 0 40 50" width="100%" height="100%">
+    <path d="M17 50 L15 30 h4 L17 50z" fill="#6b4b32"/>
+    <path d="M15 32 q-3 -3 -1 -6" stroke="#553a26" stroke-width="1"
+          fill="none" stroke-linecap="round"/>
+    <circle cx="13" cy="20" r="10" fill="#3d8f6d"/>
+    <circle cx="26" cy="19" r="9" fill="#4E9E7E"/>
+    <circle cx="19" cy="10" r="11" fill="#6fc0a3"/>
+    <circle cx="16" cy="7" r="4" fill="#8fd4b3" opacity="0.7"/>
+  </svg>`;
+}
+
 function drawTreeScene(pct, drop, baseTemp) {
   const scene = $('treeScene');
   if (!scene) return;
@@ -1352,25 +1367,28 @@ function drawTreeScene(pct, drop, baseTemp) {
   // trees start after the gardener's own planting spot, so the character
   // never sits on top of the forest it is growing
   for (let i = 0; i < trees; i += 1) {
-    const size = 18 + (i % 3) * 5;
+    const size = 24 + (i % 3) * 6;
     const left = 26 + (i * 68) / Math.max(trees, 1) + (i % 2 ? 2 : -2);
     html += `<span class="tree" style="left:${left.toFixed(1)}%;width:${size}px;
-             animation-delay:${(i * 0.06).toFixed(2)}s">
-               <span class="canopy"></span><span class="trunk"></span>
-             </span>`;
+             animation-delay:${(i * 0.06).toFixed(2)}s">${treeSVG()}</span>`;
   }
 
-  // the chibi gardener, always at work planting the next one — big head,
-  // rosy cheeks and a closed happy smile, matching the Today advice art
+  // the chibi gardener, always at work planting the next one — sun hat,
+  // collared shirt and a kneeling leg so the pose reads clearly as
+  // "a person planting", not just an abstract figure
   html += `
     <span class="soil"></span>
     <span class="seedling">
       <span class="leaf-l"></span><span class="leaf-r"></span><span class="stem"></span>
     </span>
     <span class="gardener">
-      <svg viewBox="0 0 60 66" width="100%" height="100%">
-        <!-- kneeling body -->
+      <svg viewBox="0 0 60 70" width="100%" height="100%">
+        <!-- back knee, kneeling pose -->
+        <path d="M14 66 q0 -8 6 -9 l3 9z" fill="#3d8f6d"/>
+        <!-- torso: short-sleeve shirt with a collar -->
         <path d="M18 60 q-2 -18 6 -22 q6 -3 12 0 q8 4 6 22z" fill="#4E9E7E"/>
+        <path d="M27 39 l3 4 l3 -4" stroke="#3d8f6d" stroke-width="1.4" fill="none"/>
+        <path d="M20 42 q10 6 20 0" stroke="#3d8f6d" stroke-width="1.4" fill="none"/>
         <!-- working arm + trowel, swings down to the soil -->
         <g class="g-arm">
           <path d="M36 34 q10 2 13 10" stroke="#F2D2B3" stroke-width="6"
@@ -1391,6 +1409,9 @@ function drawTreeScene(pct, drop, baseTemp) {
               fill="none" stroke-linecap="round"/>
         <circle cx="21" cy="25" r="3" fill="#E89A9A" opacity="0.65"/>
         <circle cx="39" cy="25" r="3" fill="#E89A9A" opacity="0.65"/>
+        <!-- wide sun hat, so the figure reads as "gardener" at a glance -->
+        <ellipse cx="30" cy="8" rx="20" ry="5" fill="#E3A857"/>
+        <path d="M18 8 a12 9 0 0 1 24 0z" fill="#F2C879"/>
       </svg>
     </span>`;
 
