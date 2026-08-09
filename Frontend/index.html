@@ -39,23 +39,6 @@
 </header>
 </div>
 
-<div class="install" id="installBar" hidden>
-  <span class="install-icon" aria-hidden="true">
-    <span class="fab-robot">
-      <span class="robot-head"></span><span class="robot-body"></span>
-      <span class="robot-arm-left"></span><span class="robot-arm-right"></span>
-    </span>
-  </span>
-  <div class="install-text">
-    <b id="installTitle"></b>
-    <span id="installBody"></span>
-  </div>
-  <div class="install-actions">
-    <button class="install-go" id="installGo" type="button"></button>
-    <button class="install-x" id="installDismiss" type="button" aria-label="Dismiss">✕</button>
-  </div>
-</div>
-
 <div class="shell">
 
   <nav class="sidenav" id="sidenav" aria-label="Sections">
@@ -142,12 +125,7 @@
       <div class="panel">
         <h2 data-my="နောက် ၄၈ နာရီ" data-en="Next 48 hours">နောက် ၄၈ နာရီ</h2>
         <p class="note" id="peakNote"></p>
-        <div class="chart-wrap">
-          <div class="y-axis" id="sparkY"></div>
-          <svg class="spark" id="spark" viewBox="0 0 320 110"
-               role="img" aria-label="Temperature forecast"></svg>
-        </div>
-        <div class="spark-axis" id="sparkAxis"></div>
+        <div class="bar-chart" id="forecastBars" role="img" aria-label="Temperature forecast"></div>
       </div>
     </section>
 
