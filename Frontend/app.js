@@ -30,6 +30,24 @@ const $ = (id) => document.getElementById(id);
 
 /* ---------------------------------------------------------------- language */
 
+// Static labels are swapped by the data-my/data-en walk in applyLanguage(),
+// but anything built from a template string with say() baked in at render
+// time — the ribbon, the advice card, the forecast bar labels, the compare
+// and history panels — has to be redrawn, not just re-labelled. This re-runs
+// the same renderers the startup sequence uses, working from the already-
+// cached state.live so it costs no extra network calls except the per-
+// township detail and forecast, which do need fresh localized text.
+function render() {
+  renderRibbon();
+  renderGreening();
+  fillCompare();
+  fillTownshipPicker();
+  if (state.view === 'air') renderAir();
+  if (state.view === 'compare') renderHistory();
+  if (state.view === 'map' && mapState.map) renderMap();
+  loadDetail();
+}
+
 function applyLanguage() {
   document.documentElement.lang = state.lang === 'my' ? 'my' : 'en';
 
@@ -52,8 +70,7 @@ function applyLanguage() {
   });
   $('langToggle').textContent = state.lang === 'my' ? 'EN' : 'မြန်မာ';
 
-  const bar = document.getElementById('installBar');
-  if (bar && !bar.hidden) showInstallBar(bar.dataset.mode || 'android');
+
   if (state.live) render();
 }
 
@@ -69,6 +86,142 @@ function tempColour(temp, lo, hi) {
   const span = Math.max(hi - lo, 0.1);
   const idx = Math.min(Math.floor(((temp - lo) / span) * RAMP.length), RAMP.length - 1);
   return RAMP[Math.max(idx, 0)];
+}
+
+function label(row) {
+  // Every township-name display in the app goes through this, so the
+  // language toggle affects it everywhere at once.
+  return row ? (state.lang === 'my' ? row.name_my : row.name) : '';
+}
+
+function selectTownship(name) {
+  state.township = name;
+  localStorage.setItem(`${STORE}:township`, name);
+  const url = new URL(window.location);
+  url.searchParams.set('township', name);
+  history.replaceState({}, '', url);
+
+  const picker = $('townshipPick');
+  if (picker) picker.value = name;
+
+  renderRibbon();
+  renderGreening();
+  if (state.view === 'air') renderAir();
+  loadDetail();
+}
+
+/* ------------------------------------------------------------ illustration */
+
+// A small chibi character who acts out the advice, built from plain SVG
+// shapes rather than an image file — no asset to load, themes with the
+// palette, and animates with the CSS keyframes defined for .advice-art.
+const ART = {
+  comfortable: `<svg viewBox="0 0 90 90" width="78" height="78">
+    <circle cx="45" cy="45" r="42" fill="#1B3326"/>
+    <g class="sway">
+      <rect x="14" y="52" width="3" height="16" rx="1.5" fill="#6b4b32"/>
+      <circle cx="15.5" cy="49" r="11" fill="#3d8f6d"/>
+      <circle cx="11" cy="45" r="6" fill="#4E9E7E"/>
+    </g>
+    <circle cx="72" cy="20" r="8" fill="#E3A857" class="shimmer"/>
+    <g class="bob">
+      <path d="M35 78 h20 l-3 -20 h-14z" fill="#4E9E7E"/>
+      <circle cx="45" cy="44" r="13" fill="#F2D2B3"/>
+      <path d="M32 42 a13 13 0 0 1 26 0 q-4 -7 -13 -7 t-13 7z" fill="#2E241F"/>
+      <circle cx="40" cy="45" r="1.8" fill="#2E241F"/>
+      <circle cx="50" cy="45" r="1.8" fill="#2E241F"/>
+      <path d="M41 51 q4 4 8 0" stroke="#2E241F" stroke-width="1.6"
+            fill="none" stroke-linecap="round"/>
+      <circle cx="35" cy="49" r="2.4" fill="#E89A9A" opacity="0.55"/>
+      <circle cx="55" cy="49" r="2.4" fill="#E89A9A" opacity="0.55"/>
+    </g>
+  </svg>`,
+
+  warm: `<svg viewBox="0 0 90 90" width="78" height="78">
+    <circle cx="45" cy="45" r="42" fill="#1B3326"/>
+    <circle cx="71" cy="20" r="9" fill="#E3A857" class="shimmer"/>
+    <g class="sway">
+      <rect x="14" y="54" width="3" height="14" rx="1.5" fill="#6b4b32"/>
+      <circle cx="15.5" cy="50" r="10" fill="#3d8f6d"/>
+    </g>
+    <g class="bob">
+      <path d="M35 78 h20 l-3 -20 h-14z" fill="#4E9E7E"/>
+      <circle cx="45" cy="44" r="13" fill="#F2D2B3"/>
+      <path d="M32 42 a13 13 0 0 1 26 0 q-4 -7 -13 -7 t-13 7z" fill="#2E241F"/>
+      <circle cx="40" cy="45" r="1.8" fill="#2E241F"/>
+      <circle cx="50" cy="45" r="1.8" fill="#2E241F"/>
+      <path d="M41 51 q4 3 8 0" stroke="#2E241F" stroke-width="1.6"
+            fill="none" stroke-linecap="round"/>
+      <circle cx="35" cy="49" r="2.4" fill="#E89A9A" opacity="0.6"/>
+      <circle cx="55" cy="49" r="2.4" fill="#E89A9A" opacity="0.6"/>
+    </g>
+    <g class="sip">
+      <rect x="58" y="54" width="11" height="18" rx="4" fill="#3D8FA6"/>
+      <rect x="60" y="58" width="7" height="12" rx="2" fill="#7CC49B"/>
+      <rect x="61" y="50" width="5" height="5" rx="2" fill="#B7E4C7"/>
+    </g>
+  </svg>`,
+
+  warning: `<svg viewBox="0 0 90 90" width="78" height="78">
+    <circle cx="45" cy="45" r="42" fill="#2b2419"/>
+    <circle cx="45" cy="17" r="9" fill="#E3A857" class="shimmer"/>
+    <g stroke="#E3A857" stroke-width="2.2" stroke-linecap="round" class="shimmer">
+      <line x1="45" y1="2" x2="45" y2="6"/>
+      <line x1="30" y1="17" x2="26" y2="17"/>
+      <line x1="60" y1="17" x2="64" y2="17"/>
+    </g>
+    <g class="bob">
+      <path d="M35 78 h20 l-3 -20 h-14z" fill="#4E9E7E"/>
+      <circle cx="45" cy="46" r="13" fill="#F2D2B3"/>
+      <ellipse cx="45" cy="36" rx="19" ry="5" fill="#C9A227"/>
+      <path d="M35 36 a10 8 0 0 1 20 0z" fill="#E3A857"/>
+      <circle cx="40" cy="47" r="1.8" fill="#2E241F"/>
+      <circle cx="50" cy="47" r="1.8" fill="#2E241F"/>
+      <path d="M41 53 q4 2 8 0" stroke="#2E241F" stroke-width="1.6"
+            fill="none" stroke-linecap="round"/>
+      <circle cx="35" cy="51" r="2.4" fill="#E89A9A" opacity="0.7"/>
+      <circle cx="55" cy="51" r="2.4" fill="#E89A9A" opacity="0.7"/>
+    </g>
+    <g class="sip">
+      <rect x="60" y="56" width="11" height="18" rx="4" fill="#3D8FA6"/>
+      <rect x="62" y="60" width="7" height="12" rx="2" fill="#7CC49B"/>
+    </g>
+  </svg>`,
+
+  danger: `<svg viewBox="0 0 90 90" width="78" height="78">
+    <circle cx="45" cy="45" r="42" fill="#31201c"/>
+    <circle cx="45" cy="15" r="10" fill="#C9502F" class="shimmer"/>
+    <g stroke="#A31E1E" stroke-width="2.6" stroke-linecap="round" class="shimmer">
+      <line x1="45" y1="1" x2="45" y2="5"/>
+      <line x1="28" y1="15" x2="23" y2="15"/>
+      <line x1="62" y1="15" x2="67" y2="15"/>
+    </g>
+    <path d="M16 52 L45 34 L74 52 Z" fill="#235138"/>
+    <rect x="22" y="52" width="46" height="26" rx="3" fill="#1A2E24"/>
+    <g class="bob">
+      <path d="M37 78 h16 l-2 -14 h-12z" fill="#4E9E7E"/>
+      <circle cx="45" cy="60" r="10" fill="#F2D2B3"/>
+      <path d="M35 58 a10 10 0 0 1 20 0 q-3 -5 -10 -5 t-10 5z" fill="#2E241F"/>
+      <circle cx="41" cy="61" r="1.5" fill="#2E241F"/>
+      <circle cx="49" cy="61" r="1.5" fill="#2E241F"/>
+      <path d="M42 66 q3 2 6 0" stroke="#2E241F" stroke-width="1.4"
+            fill="none" stroke-linecap="round"/>
+    </g>
+    <g class="sip">
+      <rect x="58" y="62" width="9" height="14" rx="3" fill="#3D8FA6"/>
+    </g>
+  </svg>`,
+};
+
+function renderAdvice(guide) {
+  const key = guide.level === 'comfortable' ? 'comfortable'
+    : guide.level === 'warm' ? 'warm'
+    : guide.level === 'warning' ? 'warning' : 'danger';
+
+  $('adviceArt').innerHTML = ART[key];
+  $('adviceTitle').textContent = state.lang === 'my' ? guide.headline_my : guide.headline_en;
+  $('advice').textContent = state.lang === 'my' ? guide.advice_my : guide.advice_en;
+  state.lastAdvice = `${$('adviceTitle').textContent}. ${$('advice').textContent}`;
 }
 
 const LEVEL_COLOUR = {
@@ -277,24 +430,12 @@ function isIOS() {
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
+// The install path is now reached only from the sidebar "Install app" entry,
+// on request rather than shown unasked on every visit.
+let installBannerMode = 'android';
+
 function showInstallBar(mode) {
-  if (isStandalone()) return;                                  // already installed
-  if (localStorage.getItem(`${STORE}:install-dismissed`)) return;
-
-  const bar = $('installBar');
-  $('installTitle').textContent = say('ဖုန်းမှာ တင်ထားပါ',
-                                      'Add it to your home screen');
-  $('installBody').textContent = mode === 'ios'
-    ? say('Safari ရဲ့ မျှဝေခလုတ်မှတစ်ဆင့် တင်နိုင်ပါသည်။',
-          'Install it from the Safari share menu.')
-    : say('App လိုပဲ ပွင့်ပြီး အင်တာနက်မရှိလည်း နောက်ဆုံးအချက်အလက် ကြည့်နိုင်သည်။',
-          'Opens like an app, and the last reading stays available offline.');
-  $('installGo').textContent = mode === 'ios'
-    ? say('ဘယ်လိုလုပ်ရမလဲ', 'How')
-    : say('တင်မည်', 'Install');
-
-  bar.dataset.mode = mode;
-  bar.hidden = false;
+  installBannerMode = mode;
 }
 
 function iosInstructions() {
@@ -326,9 +467,7 @@ function iosInstructions() {
 }
 
 async function runInstall() {
-  const bar = $('installBar');
-
-  if (bar.dataset.mode === 'ios') {
+  if (installBannerMode === 'ios') {
     iosInstructions();
     return;
   }
@@ -342,7 +481,6 @@ async function runInstall() {
   deferredInstall.prompt();
   const { outcome } = await deferredInstall.userChoice;
   deferredInstall = null;
-  bar.hidden = true;
 
   if (outcome === 'accepted') {
     toast(say('တင်ပြီးပါပြီ 🎉', 'Installed 🎉'));
@@ -356,11 +494,19 @@ window.addEventListener('beforeinstallprompt', (event) => {
 });
 
 window.addEventListener('appinstalled', () => {
-  $('installBar').hidden = true;
   toast(say('ဖုန်းမျက်နှာပြင်တွင် ထည့်ပြီးပါပြီ။', 'Added to your home screen.'));
 });
 
 /* ------------------------------------------------------------------- views */
+
+function safely(name, fn) {
+  try {
+    fn();
+  } catch (error) {
+    console.error(`${name} failed:`, error);
+    toast(say(`${name} ပြသရာတွင် ပြဿနာရှိသည်။`, `Could not draw ${name}.`));
+  }
+}
 
 function showView(name) {
   document.querySelectorAll('.view').forEach((view) => {
@@ -382,9 +528,9 @@ function showView(name) {
   if (name === 'map' && mapState.map) {
     setTimeout(() => mapState.map.invalidateSize(), 60);
   }
-  if (name === 'map') renderMap();
-  if (name === 'air') renderAir();
-  if (name === 'compare') { fillCompare(); renderHistory(); }
+  if (name === 'map') safely('map', renderMap);
+  if (name === 'air') safely('environment', renderAir);
+  if (name === 'compare') safely('insights', () => { fillCompare(); renderHistory(); });
 }
 
 function openDrawer() {
@@ -450,6 +596,19 @@ async function loadLive() {
   try {
     const data = await api('/api/live');
     state.live = data;
+    if (data.stale) {
+      toast(say('အနည်းငယ် ဟောင်းနေသော အချက်အလက် ပြသနေသည်။',
+                'Showing slightly older readings while the feed recovers.'));
+    } else if (data.source === 'openweathermap'
+               && sessionStorage.getItem(`${STORE}:owm-noted`) !== '1') {
+      // Open-Meteo needs no key, so a block on the shared host IP is
+      // invisible to this app's own traffic — worth a one-time note rather
+      // than silently presenting numbers from a different source as if
+      // nothing had changed. UV has no reading on this fallback path.
+      sessionStorage.setItem(`${STORE}:owm-noted`, '1');
+      toast(say('အဓိက ရာသီဥတု ရင်းမြစ် မရနိုင်သဖြင့် အရန်ရင်းမြစ်ကို သုံးနေသည် — UV အချက်အလက် ယာယီ မရနိုင်ပါ။',
+                'Primary weather source unavailable — using a backup, so UV data is temporarily missing.'));
+    }
     localStorage.setItem(`${STORE}:live`, JSON.stringify({ data, cachedAt: Date.now() }));
     $('feedDot').className = 'pulse';
     return data;
@@ -539,7 +698,6 @@ function renderHero(detail) {
 }
 
 function niceTicks(lo, hi, count = 4) {
-  // round the axis to values a reader recognises rather than raw data extremes
   const raw = (hi - lo) / count;
   const magnitude = Math.pow(10, Math.floor(Math.log10(raw)));
   const step = [1, 2, 2.5, 5, 10].find((m) => magnitude * m >= raw) * magnitude;
@@ -549,480 +707,132 @@ function niceTicks(lo, hi, count = 4) {
   return ticks;
 }
 
+/* ------------------------------------------------------- 48-hour forecast */
+
 function renderSpark(hours) {
-  const svg = $('spark');
-  if (!hours.length) { svg.innerHTML = ''; return; }
+  // A line chart with axis numbers reads well to someone used to graphs, but
+  // "what will it feel like around lunchtime" is the actual question, so this
+  // shows a handful of named time slots instead: today's readers scan it in
+  // one pass rather than decoding a plot.
+  const box = $('forecastBars');
+  if (!hours.length) { box.innerHTML = ''; return; }
 
-  const W = 320;
-  const H = 110;
-  const temps = hours.map((h) => h.temp);
-  const feels = hours.map((h) => h.feels_like ?? h.temp);
-  const ticks = niceTicks(Math.min(...temps, ...feels) - 0.5,
-                          Math.max(...temps, ...feels) + 0.5);
-  const lo = ticks[0];
-  const hi = ticks[ticks.length - 1];
-  const PAD = 14;   // room for the bottom axis line
-  const x = (i) => (i / (hours.length - 1)) * W;
-  const y = (v) => (H - PAD) - ((v - lo) / (hi - lo)) * (H - PAD - 6);
+  const SLOTS = [
+    { label_my: 'ယခု', label_en: 'Now', hour: null },
+    { label_my: 'နံနက်', label_en: 'Morning', hour: 9 },
+    { label_my: 'နေ့လယ်', label_en: 'Midday', hour: 13 },
+    { label_my: 'ညနေ', label_en: 'Evening', hour: 18 },
+    { label_my: 'သန်းခေါင်', label_en: 'Night', hour: 0, dayOffset: 1 },
+    { label_my: 'မနက်ဖြန်', label_en: 'Tomorrow', hour: 9, dayOffset: 1 },
+  ];
 
-  const path = (values) =>
-    values.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
+  const byTime = hours.map((h) => ({ ...h, dt: new Date(h.time) }));
+  const startDay = byTime[0].dt.getDate();
 
-  const peakIdx = temps.indexOf(Math.max(...temps));
-  const grid = ticks.map((t) =>
-    `<line class="grid" x1="0" y1="${y(t).toFixed(1)}" x2="${W}" y2="${y(t).toFixed(1)}"/>`).join('');
+  const picked = SLOTS.map((slot, i) => {
+    if (i === 0) return byTime[0];
+    const target = byTime.find((h) => {
+      const dayMatches = slot.dayOffset
+        ? h.dt.getDate() !== startDay
+        : h.dt.getDate() === startDay;
+      return dayMatches && h.dt.getHours() === slot.hour;
+    });
+    return target || null;
+  }).map((point, i) => point && { ...point, ...SLOTS[i] });
 
-  svg.innerHTML = `
-    ${grid}
-    <path class="band" d="${path(temps)}L${W},${(H - PAD)}L0,${(H - PAD)}Z"/>
-    <path class="feels" d="${path(feels)}"/>
-    <path class="line" d="${path(temps)}"/>
-    <circle class="peak" cx="${x(peakIdx).toFixed(1)}" cy="${y(temps[peakIdx]).toFixed(1)}" r="3.5"/>
-    <line class="axis" x1="0" y1="${H - PAD}" x2="${W}" y2="${H - PAD}"/>
-  `;
+  const valid = picked.filter(Boolean);
+  if (!valid.length) { box.innerHTML = ''; return; }
 
-  $('sparkY').innerHTML = [...ticks].reverse()
-    .map((t) => `<span>${t}°</span>`).join('');
+  const temps = valid.map((p) => p.temp);
+  const lo = Math.min(...temps);
+  const hi = Math.max(...temps);
+  const span = Math.max(hi - lo, 1);
+  const peakTemp = Math.max(...temps);
 
-  const fmt = (stamp) => stamp.slice(11, 16);
-  $('sparkAxis').innerHTML =
-    `<span>${fmt(hours[0].time)}</span>` +
-    `<span>${fmt(hours[Math.floor(hours.length / 2)].time)}</span>` +
-    `<span>${fmt(hours[hours.length - 1].time)}</span>`;
+  box.innerHTML = valid.map((p) => {
+    const heightPct = 30 + ((p.temp - lo) / span) * 70;
+    const colour = tempColour(p.temp, lo - 1, hi + 1);
+    const isPeak = p.temp === peakTemp;
+    const rainNote = p.rain_chance >= 50
+      ? `<span class="bar-rain">☔ ${p.rain_chance}%</span>` : '';
+    return `
+      <div class="bar-slot${isPeak ? ' is-peak' : ''}">
+        <span class="bar-temp">${p.temp}°</span>
+        ${rainNote}
+        <span class="bar-col" style="height:${heightPct}%;background:${colour}"></span>
+        <span class="bar-label">${say(p.label_my, p.label_en)}</span>
+      </div>`;
+  }).join('');
 
-  const peak = hours[peakIdx];
-  const when = peak.time.slice(5, 10).replace('-', '/') + ' ' + fmt(peak.time);
+  const peak = valid.find((p) => p.temp === peakTemp);
   $('peakNote').textContent = say(
-    `အပူဆုံး ${peak.temp}°C — ${when}`,
-    `Peaks at ${peak.temp}°C on ${when}`
-  );
+    `${say(peak.label_my, peak.label_en)} အချိန်ဝန်းကျင် အပူဆုံး ${peak.temp}°C ရှိနိုင်သည်။`,
+    `Likely hottest around ${say(peak.label_my, peak.label_en).toLowerCase()}, near ${peak.temp}°C.`);
 }
 
-function render() {
-  fillTownshipPicker();
-  fillCompare();
-  renderGreening();
-  renderHistory();
-  renderRibbon();
-  if (!chatHistory.length) greetChat();
-  const row = state.live.townships.find((t) => t.name === state.township);
-  if (row) {
-    // rebuild the hero from cached data so a language switch is instant
-    loadDetail();
-  }
-}
-
-/* ------------------------------------------------------------- interaction */
+/* ------------------------------------------------------ township + forecast */
 
 async function loadDetail() {
   try {
     const detail = await api(`/api/township/${encodeURIComponent(state.township)}`);
     renderHero(detail);
   } catch (error) {
-    const row = state.live?.townships.find((t) => t.name === state.township);
+    // the live payload already has everything the hero card needs, so a
+    // failed detail call still leaves the reader with a correct reading
+    const row = state.live && state.live.townships.find((r) => r.name === state.township);
     if (row) {
       $('temp').textContent = row.temp.toFixed(1);
-      $('feels').textContent = row.feels_like != null ? `${row.feels_like}°` : '—';
-      $('aqi').textContent = row.aqi || '—';
+      $('feels').textContent = row.feels_like != null ? `${row.feels_like.toFixed(1)}°` : '—';
+      $('aqi').textContent = row.aqi ? row.aqi : '—';
       $('anomaly').textContent = row.anomaly > 0 ? `+${row.anomaly}°` : `${row.anomaly}°`;
+      const g = sourcesGuidanceFallback(row);
+      $('verdict').textContent = state.lang === 'my' ? g.headline_my : g.headline_en;
+      renderAdvice(g);
     }
   }
 
   try {
     const forecast = await api(`/api/forecast?township=${encodeURIComponent(state.township)}`);
-    renderSpark(forecast.hours.slice(0, 48));
-  } catch (_) {
-    $('peakNote').textContent = say('ခန့်မှန်းချက် မရနိုင်ပါ။', 'Forecast unavailable.');
-  }
-}
-
-function selectTownship(name) {
-  state.township = name;
-  localStorage.setItem(`${STORE}:township`, name);
-  const url = new URL(window.location);
-  url.searchParams.set('township', name);
-  history.replaceState({}, '', url);
-  $('townshipPick').value = name;
-  renderRibbon();
-  renderGreening();
-  if (state.view === 'air') renderAir();
-  loadDetail();
-}
-
-function useLocation() {
-  if (!navigator.geolocation) {
-    toast(say('ဤစက်တွင် တည်နေရာ မရနိုင်ပါ။', 'This device cannot share a location.'));
-    return;
-  }
-  const button = $('locateBtn');
-  button.disabled = true;
-  navigator.geolocation.getCurrentPosition(async (pos) => {
-    try {
-      const near = await api(
-        `/api/nearest?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
-      selectTownship(near.name);
-      toast(say(`${near.name_my} — ${near.distance_km} ကီလိုမီတာ အကွာ`,
-                `${near.name} — ${near.distance_km} km away`));
-    } catch (error) {
-      toast(say('ရန်ကုန်တိုင်းအတွင်း မဟုတ်ပါ။', String(error.message)));
-    } finally {
-      button.disabled = false;
-    }
-  }, () => {
-    button.disabled = false;
-    toast(say('တည်နေရာ ခွင့်ပြုချက် မရပါ။', 'Location permission was declined.'));
-  }, { timeout: 10000 });
-}
-
-/* -------------------------------------------------------------- satellite */
-
-const satLayers = { lst: null, ndvi: null };
-
-async function setupSatellite() {
-  try {
-    const status = await api('/api/satellite/status');
-    if (!status.ready) {
-      $('satControls').hidden = false;
-      $('lstToggle').disabled = true;
-      $('ndviToggle').disabled = true;
-      $('satNote').className = 'formnote';
-      $('satNote').textContent = say(
-        'ဂြိုဟ်တုပုံများ မရနိုင်သေးပါ။', `Satellite layers unavailable — ${status.message}`);
-      return;
-    }
-    $('satControls').hidden = false;
-  } catch (_) {
-    return;   // no satellite support on this server; leave the panel hidden
-  }
-
-  $('lstToggle').addEventListener('change', (e) =>
-    toggleSatellite('lst', '/api/satellite/lst', e.target));
-  $('ndviToggle').addEventListener('change', (e) =>
-    toggleSatellite('ndvi', '/api/satellite/ndvi', e.target));
-}
-
-async function toggleSatellite(key, path, checkbox) {
-  const map = await ensureMap();
-  if (!map) return;
-
-  if (!checkbox.checked) {
-    if (satLayers[key]) {
-      if (mapState.control) mapState.control.removeLayer(satLayers[key]);
-      satLayers[key].remove();
-      satLayers[key] = null;
-    }
-    $('satNote').textContent = '';
-    return;
-  }
-
-  checkbox.disabled = true;
-  $('satNote').className = 'formnote';
-  $('satNote').textContent = say('ဂြိုဟ်တုပုံ ဆွဲနေသည်…', 'Fetching the satellite composite…');
-
-  try {
-    const layer = await api(path);
-    satLayers[key] = L.tileLayer(layer.tile_url, {
-      opacity: key === 'lst' ? 0.65 : 0.6,
-      attribution: key === 'lst'
-        ? 'Google Earth Engine / USGS Landsat'
-        : 'Google Earth Engine / Copernicus Sentinel-2',
-    }).addTo(map);
-
-    if (mapState.control) {
-      mapState.control.addOverlay(satLayers[key], key === 'lst'
-        ? say('ဂြိုဟ်တု အပူချိန်', 'Satellite temperature')
-        : say('သစ်ပင်ဖုံးလွှမ်းမှု', 'Vegetation cover'));
-    }
-
-    $('satNote').className = 'formnote ok';
-    $('satNote').textContent = key === 'lst'
-      ? say(`ပုံ ${layer.scenes} ပုံ · နောက်ဆုံး ${layer.latest_pass} · ${layer.min}–${layer.max}°C · ${layer.clipped_to || ''}`,
-            `${layer.scenes} scenes · latest ${layer.latest_pass} · ${layer.min}–${layer.max}°C · clipped to ${layer.clipped_to || 'unknown'}`)
-      : say(`Sentinel-2 ပုံ ${layer.scenes} ပုံ · အညို = ဗလာ၊ အစိမ်း = သစ်ပင်ထူထပ်`,
-            `${layer.scenes} Sentinel-2 scenes · brown = bare, green = dense vegetation`);
+    const hours = (forecast.hours || []).slice(0, 48);
+    if (!hours.length) throw new Error('no hourly points returned');
+    renderSpark(hours);
   } catch (error) {
-    checkbox.checked = false;
-    $('satNote').className = 'formnote bad';
-    $('satNote').textContent = error.message;
-  } finally {
-    checkbox.disabled = false;
+    console.error('forecast failed:', error);
+    $('forecastBars').innerHTML = '';
+    $('peakNote').textContent = say(
+      `ခန့်မှန်းချက် မရနိုင်ပါ — ${error.message}`,
+      `Forecast unavailable — ${error.message}`);
   }
 }
 
-/* ------------------------------------------------------------------- voice */
-
-let recorder = null;
-let chunks = [];
-
-async function toggleRecording() {
-  const button = $('micBtn');
-
-  if (recorder && recorder.state === 'recording') {
-    recorder.stop();
-    return;
-  }
-
-  const secure = window.isSecureContext
-    || ['localhost', '127.0.0.1'].includes(location.hostname);
-
-  if (!secure) {
-    toast(say('အသံဖြင့်မေးရန် HTTPS လိုအပ်သည် — ယခုအတိုင်း စာရိုက်ပြီး မေးနိုင်ပါသည်။',
-              'Voice input needs HTTPS. Type your question instead for now.'));
-    return;
-  }
-
-  if (!navigator.mediaDevices || !window.MediaRecorder) {
-    toast(say('ဤ browser တွင် အသံသွင်းခြင်း မရနိုင်ပါ။',
-              'This browser does not support recording.'));
-    return;
-  }
-
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    recorder = new MediaRecorder(stream);
-    chunks = [];
-
-    recorder.addEventListener('dataavailable', (e) => chunks.push(e.data));
-    recorder.addEventListener('stop', async () => {
-      stream.getTracks().forEach((track) => track.stop());
-      button.classList.remove('recording');
-      button.disabled = true;
-
-      const blob = new Blob(chunks, { type: 'audio/webm' });
-      const form = new FormData();
-      form.append('audio', blob, 'question.webm');
-      form.append('lang', state.lang);   // auto-detect misreads Burmese as Chinese
-
-      try {
-        const response = await fetch(`${API}/api/transcribe`, { method: 'POST', body: form });
-        if (!response.ok) {
-          const detail = (await response.json()).detail || response.status;
-          throw new Error(detail);
-        }
-        const { text } = await response.json();
-        if (text) {
-          // put it in the box first — Burmese transcription is imperfect, so
-          // the reader gets a chance to correct it before it is sent
-          $('chatInput').value = text;
-          $('chatInput').focus();
-          toast(say('စစ်ဆေးပြီး ↑ ကို နှိပ်ပါ။', 'Check it, then tap ↑ to send.'));
-        } else {
-          toast(say('စကားသံ မကြားရပါ။', 'Nothing was picked up.'));
-        }
-      } catch (error) {
-        toast(error.message);
-      } finally {
-        button.disabled = false;
-      }
-    });
-
-    recorder.start();
-    button.classList.add('recording');
-    toast(say('အသံသွင်းနေသည် — ပြီးလျှင် ထပ်နှိပ်ပါ။', 'Recording — tap again when done.'));
-  } catch (_) {
-    toast(say('မိုက်ခရိုဖုန်း ခွင့်ပြုချက် မရပါ။', 'Microphone permission was declined.'));
-  }
-}
-
-/* ------------------------------------------------------------------ report */
-
-async function downloadPdf() {
-  const button = $('pdfBtn');
-  const note = $('pdfNote');
-  button.disabled = true;
-  note.className = 'formnote';
-  note.textContent = say('ပြင်ဆင်နေသည်…', 'Preparing…');
-
-  try {
-    const response = await fetch(`${API}/api/report.pdf?lang=${state.lang}`);
-    if (!response.ok) {
-      const detail = (await response.json()).detail || response.status;
-      throw new Error(detail);
-    }
-    const burmeseOk = response.headers.get('X-Burmese-Font') === 'yes';
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `yangon-heat-${new Date().toISOString().slice(0, 10)}.pdf`;
-    link.click();
-    URL.revokeObjectURL(url);
-
-    note.className = 'formnote ok';
-    note.textContent = (state.lang === 'my' && !burmeseOk)
-      ? say('PDF ရပါပြီ။ ဆာဗာတွင် မြန်မာစာလုံး မရှိသဖြင့် အင်္ဂလိပ်လို ထုတ်ထားသည် — မြန်မာလိုလိုလျှင် "ပုံနှိပ်မည်" ကို သုံးပါ။',
-            'Downloaded, in English — the server has no Myanmar font. Use Print for Burmese.')
-      : say('PDF ရပါပြီ။', 'Downloaded.');
-  } catch (error) {
-    note.className = 'formnote bad';
-    note.textContent = error.message;
-  } finally {
-    button.disabled = false;
-  }
-}
-
-/* -------------------------------------------------------------- comparison */
-
-function label(row) {
-  return state.lang === 'my' ? row.name_my : row.name;
-}
-
-function fillCompare() {
-  const rows = [...state.live.townships].sort((a, b) => a.name.localeCompare(b.name));
-  const options = rows.map((r) =>
-    `<option value="${r.name}">${label(r)}</option>`).join('');
-
-  ['cmpA', 'cmpB'].forEach((id, i) => {
-    const select = $(id);
-    const previous = select.value;
-    select.innerHTML = options;
-    select.value = previous || (i === 0 ? state.township : rows[rows.length - 1].name);
-  });
-  renderCompare();
-}
-
-function renderCompare() {
-  const find = (name) => state.live.townships.find((r) => r.name === name);
-  const a = find($('cmpA').value);
-  const b = find($('cmpB').value);
-  if (!a || !b) return;
-
-  const cell = (row) => `
-    <div class="cell" style="border-left-color:${tempColour(row.temp,
-        Math.min(a.temp, b.temp) - 0.5, Math.max(a.temp, b.temp) + 0.5)}">
-      <h3>${label(row)}</h3>
-      <div class="big">${row.temp}°</div>
-      <div class="sub">${say('ခံစားရသော', 'feels')} ${row.feels_like ?? row.temp}° ·
-        AQI ${row.aqi || '—'}</div>
-    </div>`;
-
-  const gap = Math.abs(a.temp - b.temp).toFixed(1);
-  const hotter = a.temp >= b.temp ? a : b;
-  const line = a.name === b.name
-    ? say('မြို့နယ် နှစ်ခု ရွေးပါ။', 'Pick two different townships.')
-    : say(`${label(hotter)} က ${gap}°C ပိုပူသည်။ လေထုအရည်အသွေး ကွာခြားချက် ${Math.abs(a.aqi - b.aqi)} ။`,
-          `${label(hotter)} is ${gap}°C hotter. Air quality differs by ${Math.abs(a.aqi - b.aqi)} points.`);
-
-  $('cmpResult').innerHTML = cell(a) + cell(b) +
-    `<p class="verdict-line">${line}</p>`;
-}
-
-/* ------------------------------------------------------------ illustration */
-
-// Small scenes drawn inline rather than shipped as images, so they follow the
-// palette, animate, and cost nothing to load.
-const ART = {
-  // A small character who acts out the advice, so the guidance reads at a
-  // glance even for someone skimming. Built from plain shapes: no image files,
-  // themes with the palette, and animates.
-  comfortable: `<svg viewBox="0 0 90 90" width="78" height="78">
-    <circle cx="45" cy="45" r="42" fill="#1B3326"/>
-    <g class="sway">
-      <rect x="14" y="52" width="3" height="16" rx="1.5" fill="#6b4b32"/>
-      <circle cx="15.5" cy="49" r="11" fill="#3d8f6d"/>
-      <circle cx="11" cy="45" r="6" fill="#4E9E7E"/>
-    </g>
-    <circle cx="72" cy="20" r="8" fill="#E3A857" class="shimmer"/>
-    <g class="bob">
-      <path d="M35 78 h20 l-3 -20 h-14z" fill="#4E9E7E"/>
-      <circle cx="45" cy="44" r="13" fill="#F2D2B3"/>
-      <path d="M32 42 a13 13 0 0 1 26 0 q-4 -7 -13 -7 t-13 7z" fill="#2E241F"/>
-      <circle cx="40" cy="45" r="1.8" fill="#2E241F"/>
-      <circle cx="50" cy="45" r="1.8" fill="#2E241F"/>
-      <path d="M41 51 q4 4 8 0" stroke="#2E241F" stroke-width="1.6"
-            fill="none" stroke-linecap="round"/>
-      <circle cx="35" cy="49" r="2.4" fill="#E89A9A" opacity="0.55"/>
-      <circle cx="55" cy="49" r="2.4" fill="#E89A9A" opacity="0.55"/>
-    </g>
-  </svg>`,
-
-  warm: `<svg viewBox="0 0 90 90" width="78" height="78">
-    <circle cx="45" cy="45" r="42" fill="#1B3326"/>
-    <circle cx="71" cy="20" r="9" fill="#E3A857" class="shimmer"/>
-    <g class="sway">
-      <rect x="14" y="54" width="3" height="14" rx="1.5" fill="#6b4b32"/>
-      <circle cx="15.5" cy="50" r="10" fill="#3d8f6d"/>
-    </g>
-    <g class="bob">
-      <path d="M35 78 h20 l-3 -20 h-14z" fill="#4E9E7E"/>
-      <circle cx="45" cy="44" r="13" fill="#F2D2B3"/>
-      <path d="M32 42 a13 13 0 0 1 26 0 q-4 -7 -13 -7 t-13 7z" fill="#2E241F"/>
-      <circle cx="40" cy="45" r="1.8" fill="#2E241F"/>
-      <circle cx="50" cy="45" r="1.8" fill="#2E241F"/>
-      <path d="M41 51 q4 3 8 0" stroke="#2E241F" stroke-width="1.6"
-            fill="none" stroke-linecap="round"/>
-      <circle cx="35" cy="49" r="2.4" fill="#E89A9A" opacity="0.6"/>
-      <circle cx="55" cy="49" r="2.4" fill="#E89A9A" opacity="0.6"/>
-    </g>
-    <g class="sip">
-      <rect x="58" y="54" width="11" height="18" rx="4" fill="#3D8FA6"/>
-      <rect x="60" y="58" width="7" height="12" rx="2" fill="#7CC49B"/>
-      <rect x="61" y="50" width="5" height="5" rx="2" fill="#B7E4C7"/>
-    </g>
-  </svg>`,
-
-  warning: `<svg viewBox="0 0 90 90" width="78" height="78">
-    <circle cx="45" cy="45" r="42" fill="#2b2419"/>
-    <circle cx="45" cy="17" r="9" fill="#E3A857" class="shimmer"/>
-    <g stroke="#E3A857" stroke-width="2.2" stroke-linecap="round" class="shimmer">
-      <line x1="45" y1="2" x2="45" y2="6"/>
-      <line x1="30" y1="17" x2="26" y2="17"/>
-      <line x1="60" y1="17" x2="64" y2="17"/>
-    </g>
-    <g class="bob">
-      <path d="M35 78 h20 l-3 -20 h-14z" fill="#4E9E7E"/>
-      <circle cx="45" cy="46" r="13" fill="#F2D2B3"/>
-      <!-- wide-brimmed hat for the midday sun -->
-      <ellipse cx="45" cy="36" rx="19" ry="5" fill="#C9A227"/>
-      <path d="M35 36 a10 8 0 0 1 20 0z" fill="#E3A857"/>
-      <circle cx="40" cy="47" r="1.8" fill="#2E241F"/>
-      <circle cx="50" cy="47" r="1.8" fill="#2E241F"/>
-      <path d="M41 53 q4 2 8 0" stroke="#2E241F" stroke-width="1.6"
-            fill="none" stroke-linecap="round"/>
-      <circle cx="35" cy="51" r="2.4" fill="#E89A9A" opacity="0.7"/>
-      <circle cx="55" cy="51" r="2.4" fill="#E89A9A" opacity="0.7"/>
-    </g>
-    <g class="sip">
-      <rect x="60" y="56" width="11" height="18" rx="4" fill="#3D8FA6"/>
-      <rect x="62" y="60" width="7" height="12" rx="2" fill="#7CC49B"/>
-    </g>
-  </svg>`,
-
-  danger: `<svg viewBox="0 0 90 90" width="78" height="78">
-    <circle cx="45" cy="45" r="42" fill="#31201c"/>
-    <circle cx="45" cy="15" r="10" fill="#C9502F" class="shimmer"/>
-    <g stroke="#A31E1E" stroke-width="2.6" stroke-linecap="round" class="shimmer">
-      <line x1="45" y1="1" x2="45" y2="5"/>
-      <line x1="28" y1="15" x2="23" y2="15"/>
-      <line x1="62" y1="15" x2="67" y2="15"/>
-    </g>
-    <!-- indoors: the roofline says stay in -->
-    <path d="M16 52 L45 34 L74 52 Z" fill="#235138"/>
-    <rect x="22" y="52" width="46" height="26" rx="3" fill="#1A2E24"/>
-    <g class="bob">
-      <path d="M37 78 h16 l-2 -14 h-12z" fill="#4E9E7E"/>
-      <circle cx="45" cy="60" r="10" fill="#F2D2B3"/>
-      <path d="M35 58 a10 10 0 0 1 20 0 q-3 -5 -10 -5 t-10 5z" fill="#2E241F"/>
-      <circle cx="41" cy="61" r="1.5" fill="#2E241F"/>
-      <circle cx="49" cy="61" r="1.5" fill="#2E241F"/>
-      <path d="M42 66 q3 2 6 0" stroke="#2E241F" stroke-width="1.4"
-            fill="none" stroke-linecap="round"/>
-    </g>
-    <g class="sip">
-      <rect x="58" y="62" width="9" height="14" rx="3" fill="#3D8FA6"/>
-    </g>
-  </svg>`,
-};
-
-function renderAdvice(guide) {
-  const key = guide.level === 'comfortable' ? 'comfortable'
-    : guide.level === 'warm' ? 'warm'
-    : guide.level === 'warning' ? 'warning' : 'danger';
-
-  $('adviceArt').innerHTML = ART[key];
-  $('adviceTitle').textContent = state.lang === 'my' ? guide.headline_my : guide.headline_en;
-  $('advice').textContent = state.lang === 'my' ? guide.advice_my : guide.advice_en;
-  state.lastAdvice = `${$('adviceTitle').textContent}. ${$('advice').textContent}`;
+function sourcesGuidanceFallback(row) {
+  // Mirrors the server's guidance() thresholds so the hero card still says
+  // something sensible on the rare request where /api/township itself fails
+  // but the live payload came through fine.
+  const peak = Math.max(row.temp, row.feels_like || row.temp);
+  if (peak >= 40) return {
+    level: 'danger',
+    headline_my: 'အလွန်အန္တရာယ်များသည်', headline_en: 'Dangerous heat',
+    advice_my: 'အပြင်ထွက်ခြင်း ရှောင်ပါ။ ရေများများသောက်ပါ။',
+    advice_en: 'Stay inside if you can. Drink water often.',
+  };
+  if (peak >= 36) return {
+    level: 'warning',
+    headline_my: 'အပူပြင်းသည်', headline_en: 'Hot',
+    advice_my: 'နေ့လယ်ပိုင်း အပြင်လုပ်ငန်း ရှောင်ပါ။ ရေမှန်မှန်သောက်ပါ။',
+    advice_en: 'Avoid outdoor work in the middle of the day.',
+  };
+  if (peak >= 32) return {
+    level: 'warm',
+    headline_my: 'နွေးသည်', headline_en: 'Warm',
+    advice_my: 'အရိပ်ရှာပါ။ ရေဘူးတစ်လုံး ယူသွားပါ။',
+    advice_en: 'Find shade when you are out.',
+  };
+  return {
+    level: 'comfortable',
+    headline_my: 'သက်တောင့်သက်သာရှိသည်', headline_en: 'Comfortable',
+    advice_my: 'အပူဒဏ် စိုးရိမ်စရာ မရှိပါ။', advice_en: 'No heat risk right now.',
+  };
 }
 
 /* ------------------------------------------------------------------ speech */
@@ -1231,33 +1041,99 @@ function drawTreeScene(pct, drop, baseTemp) {
   html += '<span class="ground"></span>';
 
   // a low skyline so the trees read as being in a city
-  const blocks = [[8, 26, 34], [26, 20, 46], [64, 22, 30], [82, 24, 40]];
+  const blocks = [[8, 26, 34], [26, 20, 46], [64, 22, 30], [82, 22, 30], [82, 24, 40]];
   blocks.forEach(([left, width, height]) => {
     html += `<span class="building" style="left:${left}%;width:${width}px;height:${height}px"></span>`;
   });
 
+  // trees start after the gardener's own planting spot, so the character
+  // never sits on top of the forest it is growing
   for (let i = 0; i < trees; i += 1) {
-    const size = 20 + (i % 3) * 5;
-    const left = 6 + (i * 88) / Math.max(trees, 1) + (i % 2 ? 2 : -2);
+    const size = 18 + (i % 3) * 5;
+    const left = 26 + (i * 68) / Math.max(trees, 1) + (i % 2 ? 2 : -2);
     html += `<span class="tree" style="left:${left.toFixed(1)}%;width:${size}px;
              animation-delay:${(i * 0.06).toFixed(2)}s">
                <span class="canopy"></span><span class="trunk"></span>
              </span>`;
   }
 
-  // birds arrive as soon as there is a canopy worth living in
+  // the chibi gardener, always at work planting the next one — same visual
+  // language as the Today advice art (round head, F2D2B3 skin, 2E241F hair)
+  html += `
+    <span class="soil"></span>
+    <span class="seedling">
+      <span class="leaf-l"></span><span class="leaf-r"></span><span class="stem"></span>
+    </span>
+    <span class="gardener">
+      <span class="head"><span class="hair"></span></span>
+      <span class="body"></span>
+      <span class="trowel"></span>
+      <span class="arm"></span>
+      <span class="legs"></span>
+    </span>`;
+
+  // birds arrive once there is a canopy worth living in
   if (trees >= 2) {
-    html += `<span class="bird" style="left:20%;top:20%"></span>`;
+    html += `<span class="bird" style="left:46%;top:20%"></span>`;
   }
   if (trees >= 4) {
-    html += `<span class="bird" style="left:58%;top:13%;animation-delay:1.1s"></span>`;
+    html += `<span class="bird" style="left:68%;top:13%;animation-delay:1.1s"></span>`;
   }
   if (trees >= 7) {
-    html += `<span class="bird" style="left:78%;top:26%;animation-delay:2.2s"></span>`;
+    html += `<span class="bird" style="left:84%;top:26%;animation-delay:2.2s"></span>`;
   }
 
   html += `<span class="drop">${baseTemp}° → ${(baseTemp - drop).toFixed(1)}°</span>`;
   scene.innerHTML = html;
+}
+
+/* -------------------------------------------------------------- comparison */
+
+function fillCompare() {
+  const rows = [...state.live.townships].sort((a, b) => a.name.localeCompare(b.name));
+  const options = rows.map((r) => `<option value="${r.name}">${label(r)}</option>`).join('');
+
+  const a = $('cmpA');
+  const b = $('cmpB');
+  const prevA = a.value;
+  const prevB = b.value;
+  const names = rows.map((r) => r.name);
+
+  a.innerHTML = options;
+  b.innerHTML = options;
+  a.value = names.includes(prevA) ? prevA : state.township;
+  b.value = names.includes(prevB) && prevB !== a.value
+    ? prevB
+    : (names.find((n) => n !== a.value) || names[0]);
+
+  renderCompare();
+}
+
+function renderCompare() {
+  const rowA = state.live.townships.find((r) => r.name === $('cmpA').value);
+  const rowB = state.live.townships.find((r) => r.name === $('cmpB').value);
+  if (!rowA || !rowB) return;
+
+  const lo = Math.min(rowA.temp, rowB.temp) - 1;
+  const hi = Math.max(rowA.temp, rowB.temp) + 1;
+
+  const cell = (row) => `
+    <div class="cell" style="border-left-color:${tempColour(row.temp, lo, hi)}">
+      <h3>${label(row)}</h3>
+      <div class="big" style="color:${tempColour(row.temp, lo, hi)}">${row.temp}°</div>
+      <div class="sub">${say('ခံစားရသော', 'Feels')} ${row.feels_like ?? row.temp}° ·
+        AQI ${row.aqi || '—'}</div>
+    </div>`;
+
+  const diff = Math.abs(rowA.temp - rowB.temp).toFixed(1);
+  const hotter = rowA.temp >= rowB.temp ? rowA : rowB;
+  const line = rowA.name === rowB.name
+    ? say('မတူညီသော မြို့နယ် နှစ်ခု ရွေးပါ။', 'Pick two different townships.')
+    : say(`${label(hotter)} က ${diff}°C ပိုပူသည်။ လေထုအရည်အသွေး ကွာခြားချက် ${Math.abs((rowA.aqi||0) - (rowB.aqi||0))} ။`,
+          `${label(hotter)} is ${diff}°C hotter. Air quality differs by ${Math.abs((rowA.aqi||0) - (rowB.aqi||0))} points.`);
+
+  $('cmpResult').innerHTML = cell(rowA) + cell(rowB) +
+    `<p class="verdict-line">${line}</p>`;
 }
 
 function renderGreening() {
@@ -1645,18 +1521,9 @@ async function start() {
               'Open the browser menu and choose "Add to Home screen".'));
   });
 
-  $('installGo').addEventListener('click', runInstall);
-  $('installDismiss').addEventListener('click', () => {
-    $('installBar').hidden = true;
-    localStorage.setItem(`${STORE}:install-dismissed`, '1');
-  });
-
   if (isStandalone()) $('navInstall').hidden = true;
 
-  // Safari never announces itself, so offer the walkthrough after a short wait
-  if (isIOS() && !isStandalone()) {
-    setTimeout(() => showInstallBar('ios'), 2500);
-  }
+  if (isIOS() && !isStandalone()) installBannerMode = 'ios';
 
   $('bellBtn').addEventListener('click', showNotices);
   $('notifyBtn').addEventListener('click', enableNotifications);
@@ -1695,12 +1562,12 @@ async function start() {
     || (valid(state.township) && state.township)
     || state.live.townships[0].name;
 
-  fillTownshipPicker();
-  fillCompare();
-  renderRibbon();
-  renderGreening();
-  setupSatellite();
-  checkThreshold();
+  safely('township list', fillTownshipPicker);
+  safely('comparison', fillCompare);
+  safely('city ribbon', renderRibbon);
+  safely('tree scene', renderGreening);
+  safely('satellite', setupSatellite);
+  safely('alerts', checkThreshold);
 
   $('alertStatus').textContent = say(
     'အီးမေးလ် သတိပေးချက်များကို နာရီတိုင်း စစ်ဆေးပြီး ပို့ပါသည်။ ဆာဗာတွင် အီးမေးလ် အချက်အလက် မထည့်ရသေးပါက မှတ်ပုံတင်ထားသော်လည်း စာမပို့နိုင်သေးပါ။',
