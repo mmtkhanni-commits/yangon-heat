@@ -110,6 +110,144 @@ function selectTownship(name) {
   loadDetail();
 }
 
+/* ------------------------------------------------------------------- geo */
+
+// Wired to #locateBtn ("Use my location"), which already existed in the
+// markup with no function behind it — this was firing a ReferenceError on
+// every page load, before the button was even clicked, because addEventListener
+// evaluates its handler argument immediately.
+async function useLocation() {
+  const btn = $('locateBtn');
+  const original = btn.innerHTML;
+
+  if (!navigator.geolocation) {
+    toast(say('ဤ browser တွင် တည်နေရာ အသုံးပြု၍ မရပါ။',
+              'This browser cannot provide your location.'));
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = `<span>${say('ရှာနေသည်…', 'Locating…')}</span>`;
+
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      try {
+        const { latitude, longitude } = position.coords;
+        const nearest = await api(`/api/nearest?lat=${latitude}&lon=${longitude}`);
+        selectTownship(nearest.name);
+        toast(say(`${label(nearest)} ကို အနီးဆုံး မြို့နယ်အဖြစ် ရွေးပြီးပါပြီ။`,
+                  `Set to your nearest township: ${label(nearest)}.`));
+      } catch (error) {
+        const outside = String(error.message || '').includes('404');
+        toast(outside
+          ? say('ဤတည်နေရာသည် ရန်ကုန်တိုင်းအတွင်း မရှိပါ။',
+                'This location is outside Yangon Region.')
+          : say('မြို့နယ် ရှာမတွေ့ပါ။ ထပ်စမ်းကြည့်ပါ။',
+                'Could not find a nearby township. Try again.'));
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+      }
+    },
+    (error) => {
+      btn.disabled = false;
+      btn.innerHTML = original;
+      const denied = error.code === error.PERMISSION_DENIED;
+      toast(denied
+        ? say('တည်နေရာ ခွင့်ပြုချက် မရပါ။ browser ဆက်တင်တွင် ခွင့်ပြုနိုင်ပါသည်။',
+              'Location permission denied. You can allow it in your browser settings.')
+        : say('တည်နေရာ ရှာ၍ မရပါ။', 'Could not determine your location.'));
+    },
+    { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+  );
+}
+
+/* ------------------------------------------------------------------- voice */
+
+// Wired to #micBtn, which — like #locateBtn earlier — had a listener
+// pointing at a function that had never actually been written.
+let mediaRecorder = null;
+let recordedChunks = [];
+
+function isSecureForRecording() {
+  return window.isSecureContext
+    || ['localhost', '127.0.0.1'].includes(location.hostname);
+}
+
+async function toggleRecording() {
+  const btn = $('micBtn');
+
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+    return;
+  }
+
+  if (!isSecureForRecording()) {
+    toast(say('အသံဖြင့်မေးရန် HTTPS လိုအပ်သည် — ယခုအတိုင်း စာရိုက်ပြီး မေးနိုင်ပါသည်။',
+              'Voice input needs HTTPS. Type your question instead for now.'));
+    return;
+  }
+
+  if (!navigator.mediaDevices || !window.MediaRecorder) {
+    toast(say('ဤ browser တွင် အသံသွင်းခြင်း မရနိုင်ပါ။',
+              'This browser does not support recording.'));
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) recordedChunks.push(event.data);
+    };
+
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach((track) => track.stop());
+      btn.classList.remove('recording');
+
+      const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+      if (blob.size < 500) return;   // stopped almost instantly — nothing to send
+
+      const form = new FormData();
+      form.append('audio', blob, 'question.webm');
+      form.append('lang', state.lang);   // auto-detect misreads Burmese as Chinese
+
+      try {
+        const response = await fetch(`${API}/api/transcribe`, { method: 'POST', body: form });
+        if (!response.ok) throw new Error(`status ${response.status}`);
+        const { text } = await response.json();
+        if (text) {
+          // put it in the box first — transcription is imperfect, so the
+          // reader gets a chance to correct it before it is sent
+          $('chatInput').value = text;
+          $('chatInput').focus();
+          toast(say('စစ်ဆေးပြီး ↑ ကို နှိပ်ပါ။', 'Check it, then tap ↑ to send.'));
+        } else {
+          toast(say('စကားသံ မကြားရပါ။', 'Nothing was picked up.'));
+        }
+      } catch (error) {
+        toast(say('အသံမှ စာသို့ ပြောင်း၍ မရပါ။', 'Could not transcribe that.'));
+      }
+    };
+
+    mediaRecorder.start();
+    btn.classList.add('recording');
+  } catch (error) {
+    toast(say('မိုက်ခရိုဖုန်း ခွင့်ပြုချက် မရပါ။', 'Microphone permission was denied.'));
+  }
+}
+
+/* -------------------------------------------------------------------- pdf */
+
+function downloadPdf() {
+  const note = $('pdfNote');
+  note.textContent = say('PDF ပြင်ဆင်နေသည်…', 'Preparing the PDF…');
+  window.open(`${API}/api/report.pdf?lang=${state.lang}`, '_blank');
+  setTimeout(() => { note.textContent = ''; }, 3000);
+}
+
 /* ------------------------------------------------------------ illustration */
 
 // A small chibi character who acts out the advice, built from plain SVG
