@@ -1,4 +1,7 @@
-/* Yangon Heat — front end.
+cd C:\Users\hp\Downloads\UHI_Project
+git add .
+git commit -m "More detailed tree and gardener illustrations"
+git push/* Yangon Heat — front end.
    Talks to the FastAPI backend. Set window.API_BASE before this script loads if
    the API lives on another host; otherwise it uses the current origin. */
 
