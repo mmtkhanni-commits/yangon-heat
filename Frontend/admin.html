@@ -19,63 +19,75 @@
   .btn-danger { background: var(--ember); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; }
   .btn-danger:hover { opacity: 0.8; }
   .badge { padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 12px; }
+  .lock-screen { text-align: center; padding: 40px 20px; background: var(--slate-up); border-radius: 12px; border: 1px solid var(--line); margin-top: 20px; }
 </style>
 </head>
 <body>
 
 <div class="admin-header">
   <h2>Yangon Heat Admin Dashboard</h2>
-  <div class="token-box">
-    <label>Admin Token:</label>
-    <input type="password" id="adminToken" placeholder="Enter Token">
-    <button class="tab-btn active" onclick="loadData()">Connect</button>
+  <div class="token-box" id="tokenBox" style="display:none;">
+    <button class="tab-btn" onclick="logout()">Logout</button>
   </div>
 </div>
 
-<div class="tab-buttons">
-  <button class="tab-btn active" id="tabReportsBtn" onclick="switchTab('reports')">Reports</button>
-  <button class="tab-btn" id="tabSubsBtn" onclick="switchTab('subs')">Alert Subscriptions</button>
+<!-- Secret Token Login Screen -->
+<div id="lockScreen" class="lock-screen">
+  <h3>🔑 Admin Authentication Required</h3>
+  <p style="color: var(--muted); margin-bottom: 15px;">စနစ်စီမံခန့်ခွဲသူများသာ ဝင်ရောက်နိုင်ရန် Secret Token ရိုက်ထည့်ပေးပါ။</p>
+  <div style="display: flex; gap: 10px; justify-content: center; max-width: 320px; margin: 0 auto;">
+    <input type="password" id="adminToken" placeholder="Enter Secret Token" style="padding: 10px; background: var(--slate); border: 1px solid var(--line); border-radius: 6px; color: var(--text); flex: 1;">
+    <button class="tab-btn active" onclick="login()">Connect</button>
+  </div>
 </div>
 
-<!-- Reports Section -->
-<div id="sectionReports">
-  <h3>User Reports</h3>
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Time</th>
-        <th>Name</th>
-        <th>Township</th>
-        <th>Intensity</th>
-        <th>Notes</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody id="reportsTable">
-      <tr><td colspan="7" style="text-align:center;">Enter Token & Connect to load data</td></tr>
-    </tbody>
-  </table>
-</div>
+<!-- Admin Content -->
+<div id="adminContent" style="display:none;">
+  <div class="tab-buttons">
+    <button class="tab-btn active" id="tabReportsBtn" onclick="switchTab('reports')">Reports</button>
+    <button class="tab-btn" id="tabSubsBtn" onclick="switchTab('subs')">Alert Subscriptions</button>
+  </div>
 
-<!-- Subscriptions Section -->
-<div id="sectionSubs" style="display:none;">
-  <h3>Alert Subscriptions</h3>
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Created / Last Sent</th>
-        <th>Email</th>
-        <th>Township</th>
-        <th>Threshold (°C)</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody id="subsTable">
-      <tr><td colspan="6" style="text-align:center;">Enter Token & Connect to load data</td></tr>
-    </tbody>
-  </table>
+  <!-- Reports Section -->
+  <div id="sectionReports">
+    <h3>User Reports</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Time</th>
+          <th>Name</th>
+          <th>Township</th>
+          <th>Intensity</th>
+          <th>Notes</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="reportsTable">
+        <tr><td colspan="7" style="text-align:center;">Loading data...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Subscriptions Section -->
+  <div id="sectionSubs" style="display:none;">
+    <h3>Alert Subscriptions</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Created / Last Sent</th>
+          <th>Email</th>
+          <th>Township</th>
+          <th>Threshold (°C)</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="subsTable">
+        <tr><td colspan="6" style="text-align:center;">Loading data...</td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <script>
@@ -83,7 +95,32 @@ const API_BASE = window.location.origin.includes('8000') ? '' : 'https://yangon-
 let activeTab = 'reports';
 
 function getToken() {
-  return document.getElementById('adminToken').value.trim();
+  return localStorage.getItem('admin_token') || document.getElementById('adminToken').value.trim();
+}
+
+async function login() {
+  const token = document.getElementById('adminToken').value.trim();
+  if (!token) {
+    alert("Please enter the Secret Token.");
+    return;
+  }
+  localStorage.setItem('admin_token', token);
+  const success = await loadData();
+  if (success) {
+    document.getElementById('lockScreen').style.display = 'none';
+    document.getElementById('adminContent').style.display = 'block';
+    document.getElementById('tokenBox').style.display = 'flex';
+  } else {
+    localStorage.removeItem('admin_token');
+  }
+}
+
+function logout() {
+  localStorage.removeItem('admin_token');
+  document.getElementById('lockScreen').style.display = 'block';
+  document.getElementById('adminContent').style.display = 'none';
+  document.getElementById('tokenBox').style.display = 'none';
+  document.getElementById('adminToken').value = '';
 }
 
 function switchTab(tab) {
@@ -97,10 +134,8 @@ function switchTab(tab) {
 
 async function fetchAdmin(endpoint, options = {}) {
   const token = getToken();
-  if (!token) {
-    alert("Please enter the Admin Token first.");
-    return null;
-  }
+  if (!token) return null;
+  
   options.headers = {
     ...options.headers,
     'X-Admin-Token': token,
@@ -108,7 +143,7 @@ async function fetchAdmin(endpoint, options = {}) {
   };
   const res = await fetch(`${API_BASE}${endpoint}`, options);
   if (res.status === 401) {
-    alert("Unauthorized: Incorrect Token");
+    alert("Unauthorized: Correct Secret Token မဟုတ်ပါသဖြင့် ဝင်ရောက်ခွင့်မရှိပါ။");
     return null;
   }
   if (!res.ok) {
@@ -121,7 +156,7 @@ async function fetchAdmin(endpoint, options = {}) {
 async function loadData() {
   if (activeTab === 'reports') {
     const data = await fetchAdmin('/api/admin/reports');
-    if (!data) return;
+    if (!data) return false;
     const tbody = document.getElementById('reportsTable');
     tbody.innerHTML = data.reports.map(r => `
       <tr>
@@ -136,7 +171,7 @@ async function loadData() {
     `).join('') || '<tr><td colspan="7">No reports found</td></tr>';
   } else {
     const data = await fetchAdmin('/api/admin/subscriptions');
-    if (!data) return;
+    if (!data) return false;
     const tbody = document.getElementById('subsTable');
     tbody.innerHTML = data.subscriptions.map(s => `
       <tr>
@@ -149,6 +184,7 @@ async function loadData() {
       </tr>
     `).join('') || '<tr><td colspan="6">No subscriptions found</td></tr>';
   }
+  return true;
 }
 
 async function deleteReport(id) {
@@ -166,6 +202,12 @@ async function deleteSub(id) {
 function escapeHtml(str) {
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
+
+window.onload = function() {
+  if (localStorage.getItem('admin_token')) {
+    login();
+  }
+};
 </script>
 </body>
 </html>
