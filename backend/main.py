@@ -11,7 +11,7 @@ import tempfile
 from datetime import date
 
 import httpx
-from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -416,6 +416,44 @@ def unsubscribe(email: EmailStr, township: str | None = None):
     if not removed:
         raise HTTPException(404, "No subscription found for that address.")
     return {"status": "removed", "count": removed}
+
+
+
+
+# ------------------------------------------------------------------ admin API
+
+ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "admin-secret-key").strip()
+
+def verify_admin(x_admin_token: str = Header(...)):
+    if x_admin_token != ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized Admin Token")
+    return True
+
+
+@app.get("/api/admin/reports")
+def admin_list_reports(limit: int = Query(default=200, ge=1, le=1000), _: bool = Depends(verify_admin)):
+    return {"reports": db.list_reports(limit), "summary": db.report_summary()}
+
+
+@app.delete("/api/admin/reports/{report_id}")
+def admin_delete_report(report_id: int, _: bool = Depends(verify_admin)):
+    deleted = db.delete_report(report_id)
+    if not deleted:
+        raise HTTPException(404, "Report not found")
+    return {"status": "deleted", "id": report_id}
+
+
+@app.get("/api/admin/subscriptions")
+def admin_list_subscriptions(_: bool = Depends(verify_admin)):
+    return {"subscriptions": db.list_subscriptions()}
+
+
+@app.delete("/api/admin/subscriptions/{sub_id}")
+def admin_delete_subscription(sub_id: int, _: bool = Depends(verify_admin)):
+    deleted = db.delete_subscription_by_id(sub_id)
+    if not deleted:
+        raise HTTPException(404, "Subscription not found")
+    return {"status": "deleted", "id": sub_id}
 
 
 # Serve the built frontend from the same origin when it is present, so a single

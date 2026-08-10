@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yangon Heat — Admin Dashboard</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  body { padding: 20px; max-width: 1000px; margin: 0 auto; }
+  .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 15px; }
+  .token-box { display: flex; gap: 10px; align-items: center; }
+  .token-box input { padding: 8px 12px; background: var(--slate-up); border: 1px solid var(--line); border-radius: 6px; color: var(--text); }
+  .tab-buttons { display: flex; gap: 10px; margin-bottom: 15px; }
+  .tab-btn { padding: 8px 16px; background: var(--slate); border: 1px solid var(--line); color: var(--muted); border-radius: 8px; cursor: pointer; }
+  .tab-btn.active { background: var(--fern); color: var(--text); border-color: var(--shoot); }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+  th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--line); }
+  th { background: var(--slate-up); color: var(--shoot); }
+  .btn-danger { background: var(--ember); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+  .btn-danger:hover { opacity: 0.8; }
+  .badge { padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="admin-header">
+  <h2>Yangon Heat Admin Dashboard</h2>
+  <div class="token-box">
+    <label>Admin Token:</label>
+    <input type="password" id="adminToken" placeholder="Enter Token">
+    <button class="tab-btn active" onclick="loadData()">Connect</button>
+  </div>
+</div>
+
+<div class="tab-buttons">
+  <button class="tab-btn active" id="tabReportsBtn" onclick="switchTab('reports')">Reports</button>
+  <button class="tab-btn" id="tabSubsBtn" onclick="switchTab('subs')">Alert Subscriptions</button>
+</div>
+
+<!-- Reports Section -->
+<div id="sectionReports">
+  <h3>User Reports</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Time</th>
+        <th>Name</th>
+        <th>Township</th>
+        <th>Intensity</th>
+        <th>Notes</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="reportsTable">
+      <tr><td colspan="7" style="text-align:center;">Enter Token & Connect to load data</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Subscriptions Section -->
+<div id="sectionSubs" style="display:none;">
+  <h3>Alert Subscriptions</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Created / Last Sent</th>
+        <th>Email</th>
+        <th>Township</th>
+        <th>Threshold (°C)</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="subsTable">
+      <tr><td colspan="6" style="text-align:center;">Enter Token & Connect to load data</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+const API_BASE = window.location.origin.includes('8000') ? '' : 'https://yangon-heat-api.onrender.com';
+let activeTab = 'reports';
+
+function getToken() {
+  return document.getElementById('adminToken').value.trim();
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.getElementById('sectionReports').style.display = tab === 'reports' ? 'block' : 'none';
+  document.getElementById('sectionSubs').style.display = tab === 'subs' ? 'block' : 'none';
+  document.getElementById('tabReportsBtn').classList.toggle('active', tab === 'reports');
+  document.getElementById('tabSubsBtn').classList.toggle('active', tab === 'subs');
+  loadData();
+}
+
+async function fetchAdmin(endpoint, options = {}) {
+  const token = getToken();
+  if (!token) {
+    alert("Please enter the Admin Token first.");
+    return null;
+  }
+  options.headers = {
+    ...options.headers,
+    'X-Admin-Token': token,
+    'Content-Type': 'application/json'
+  };
+  const res = await fetch(`${API_BASE}${endpoint}`, options);
+  if (res.status === 401) {
+    alert("Unauthorized: Incorrect Token");
+    return null;
+  }
+  if (!res.ok) {
+    alert("Failed to fetch data");
+    return null;
+  }
+  return res.json();
+}
+
+async function loadData() {
+  if (activeTab === 'reports') {
+    const data = await fetchAdmin('/api/admin/reports');
+    if (!data) return;
+    const tbody = document.getElementById('reportsTable');
+    tbody.innerHTML = data.reports.map(r => `
+      <tr>
+        <td>${r.id || '-'}</td>
+        <td>${r.submitted_at ? String(r.submitted_at).replace('T', ' ').slice(0, 16) : '-'}</td>
+        <td><b>${escapeHtml(r.name)}</b></td>
+        <td>${escapeHtml(r.township)}</td>
+        <td><span class="badge" style="background:${r.intensity > 7 ? 'var(--ember)' : 'var(--thanaka)'}">${r.intensity}/10</span></td>
+        <td>${escapeHtml(r.notes || '')}</td>
+        <td><button class="btn-danger" onclick="deleteReport(${r.id})">Delete</button></td>
+      </tr>
+    `).join('') || '<tr><td colspan="7">No reports found</td></tr>';
+  } else {
+    const data = await fetchAdmin('/api/admin/subscriptions');
+    if (!data) return;
+    const tbody = document.getElementById('subsTable');
+    tbody.innerHTML = data.subscriptions.map(s => `
+      <tr>
+        <td>${s.id}</td>
+        <td>${s.last_sent ? 'Sent: ' + String(s.last_sent).slice(0, 16) : 'Registered'}</td>
+        <td><b>${escapeHtml(s.email)}</b></td>
+        <td>${escapeHtml(s.township)}</td>
+        <td>${s.threshold} °C</td>
+        <td><button class="btn-danger" onclick="deleteSub(${s.id})">Delete</button></td>
+      </tr>
+    `).join('') || '<tr><td colspan="6">No subscriptions found</td></tr>';
+  }
+}
+
+async function deleteReport(id) {
+  if (!confirm(`Are you sure you want to delete Report #${id}?`)) return;
+  const res = await fetchAdmin(`/api/admin/reports/${id}`, { method: 'DELETE' });
+  if (res) loadData();
+}
+
+async function deleteSub(id) {
+  if (!confirm(`Are you sure you want to delete Subscription #${id}?`)) return;
+  const res = await fetchAdmin(`/api/admin/subscriptions/${id}`, { method: 'DELETE' });
+  if (res) loadData();
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+</script>
+</body>
+</html>

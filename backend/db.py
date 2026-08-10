@@ -319,3 +319,19 @@ def reading_history(hours=168):
             " GROUP BY recorded_hour ORDER BY recorded_hour DESC LIMIT ?", (hours,))
         rows = [dict(r) for r in cur.fetchall()]
     return list(reversed(rows))
+
+
+# ------------------------------------------------------------------ admin actions
+
+def delete_report(report_id: int) -> int:
+    with connection() as conn:
+        cur = conn.cursor()
+        cur.execute(_q("DELETE FROM reports WHERE id = %s"), (report_id,))
+        return cur.rowcount
+
+
+def delete_subscription_by_id(sub_id: int) -> int:
+    with connection() as conn:
+        cur = conn.cursor()
+        cur.execute(_q("DELETE FROM subscriptions WHERE id = %s"), (sub_id,))
+        return cur.rowcount

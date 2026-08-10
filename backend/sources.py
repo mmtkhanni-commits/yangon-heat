@@ -385,6 +385,7 @@ def _ts_to_str(value):
 # since Open-Meteo's per-township detail (UV, precipitation) is better.
 OWM_WEATHER_URL = "https://api.openweathermap.org/data/2.5/weather"
 OWM_AIR_URL = "https://api.openweathermap.org/data/2.5/air_pollution"
+OWM_FORECAST_URL = "https://api.openweathermap.org/data/2.5/forecast"
 
 # EPA's published PM2.5 24-hour breakpoints, used only to derive a comparable
 # US AQI figure when the fallback provider does not supply its own - OpenWeatherMap's
@@ -691,6 +692,33 @@ def _fetch_all_forecasts_uncached():
     return by_name
 
 
+def _fetch_owm_forecast(lat, lon):
+    """3-hour-interval outlook from OpenWeatherMap, reshaped to match
+    Open-Meteo's hourly points. One call per requested point - no batching
+    needed here since this only runs for whichever single township someone
+    is actually looking at, well inside OWM's free-tier limits.
+    """
+    key = _owm_key()
+    if not key:
+        raise RuntimeError("OWM_API_KEY is not set")
+
+    with httpx.Client(timeout=15) as client:
+        response = client.get(OWM_FORECAST_URL, params={
+            "lat": lat, "lon": lon, "appid": key, "units": "metric"})
+        response.raise_for_status()
+
+    points = []
+    for entry in response.json().get("list", [])[:24]:   # 24 x 3h = 3 days
+        main = entry.get("main", {})
+        points.append({
+            "time": entry["dt_txt"].replace(" ", "T"),
+            "temp": main.get("temp"),
+            "feels_like": main.get("feels_like"),
+            "rain_chance": round(entry.get("pop", 0) * 100),
+        })
+    return {"hours": points, "source": "openweathermap"}
+
+
 def _find_township_name(lat, lon, tolerance=0.01):
     townships, _ = get_townships()
     for t in townships:
@@ -731,13 +759,20 @@ def fetch_forecast(lat, lon):
                                        next_fetch_at.isoformat())
                 if name in by_name:
                     return by_name[name]
-            except Exception:
+            except Exception as primary_error:
                 # Open-Meteo unreachable or still rate limited - an hour-old
                 # forecast beats a 503 for every visitor
                 if row:
                     by_name = json.loads(row["payload"])
                     if name in by_name:
                         return by_name[name]
+                if _owm_key():
+                    try:
+                        return _fetch_owm_forecast(lat, lon)
+                    except Exception as fallback_error:
+                        raise RuntimeError(
+                            f"Open-Meteo failed ({primary_error}); OpenWeatherMap "
+                            f"fallback also failed ({fallback_error})") from fallback_error
                 raise
 
     # not one of the 44 known townships - fetch this point on its own
@@ -746,24 +781,34 @@ def fetch_forecast(lat, lon):
     if cached:
         return cached
 
-    with httpx.Client(timeout=30) as client:
-        resp = _get_with_retry(client, WEATHER_URL, {
-            "latitude": lat, "longitude": lon,
-            "hourly": "temperature_2m,apparent_temperature,precipitation_probability",
-            "forecast_days": 3, "timezone": "Asia/Yangon",
-        })
-    hourly = resp.json().get("hourly", {})
-    points = []
-    for i, stamp in enumerate(hourly.get("time", [])):
-        points.append({
-            "time": stamp,
-            "temp": hourly["temperature_2m"][i],
-            "feels_like": hourly["apparent_temperature"][i],
-            "rain_chance": hourly["precipitation_probability"][i],
-        })
-    payload = {"hours": points[:72]}
-    _write_cache(key, payload)
-    return payload
+    try:
+        with httpx.Client(timeout=30) as client:
+            resp = _get_with_retry(client, WEATHER_URL, {
+                "latitude": lat, "longitude": lon,
+                "hourly": "temperature_2m,apparent_temperature,precipitation_probability",
+                "forecast_days": 3, "timezone": "Asia/Yangon",
+            })
+        hourly = resp.json().get("hourly", {})
+        points = []
+        for i, stamp in enumerate(hourly.get("time", [])):
+            points.append({
+                "time": stamp,
+                "temp": hourly["temperature_2m"][i],
+                "feels_like": hourly["apparent_temperature"][i],
+                "rain_chance": hourly["precipitation_probability"][i],
+            })
+        payload = {"hours": points[:72]}
+        _write_cache(key, payload)
+        return payload
+    except Exception as primary_error:
+        if _owm_key():
+            try:
+                return _fetch_owm_forecast(lat, lon)
+            except Exception as fallback_error:
+                raise RuntimeError(
+                    f"Open-Meteo failed ({primary_error}); OpenWeatherMap "
+                    f"fallback also failed ({fallback_error})") from fallback_error
+        raise
 
 
 def fetch_climate_history(years=15):
