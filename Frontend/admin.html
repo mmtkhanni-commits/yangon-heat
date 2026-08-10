@@ -8,10 +8,9 @@
 <style>
   body { padding: 20px; max-width: 1000px; margin: 0 auto; }
   .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 15px; }
-  .token-box { display: flex; gap: 10px; align-items: center; }
-  .token-box input { padding: 8px 12px; background: var(--slate-up); border: 1px solid var(--line); border-radius: 6px; color: var(--text); }
+  .header-actions { display: flex; gap: 10px; align-items: center; }
   .tab-buttons { display: flex; gap: 10px; margin-bottom: 15px; }
-  .tab-btn { padding: 8px 16px; background: var(--slate); border: 1px solid var(--line); color: var(--muted); border-radius: 8px; cursor: pointer; }
+  .tab-btn { padding: 8px 16px; background: var(--slate); border: 1px solid var(--line); color: var(--muted); border-radius: 8px; cursor: pointer; text-decoration: none; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; }
   .tab-btn.active { background: var(--fern); color: var(--text); border-color: var(--shoot); }
   table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
   th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--line); }
@@ -26,8 +25,9 @@
 
 <div class="admin-header">
   <h2>Yangon Heat Admin Dashboard</h2>
-  <div class="token-box" id="tokenBox" style="display:none;">
-    <button class="tab-btn" onclick="logout()">Logout</button>
+  <div class="header-actions">
+    <a href="index.html" class="tab-btn">⬅ Back to App</a>
+    <button class="tab-btn" id="logoutBtn" style="display:none;" onclick="logout()">Logout</button>
   </div>
 </div>
 
@@ -109,7 +109,7 @@ async function login() {
   if (success) {
     document.getElementById('lockScreen').style.display = 'none';
     document.getElementById('adminContent').style.display = 'block';
-    document.getElementById('tokenBox').style.display = 'flex';
+    document.getElementById('logoutBtn').style.display = 'inline-flex';
   } else {
     localStorage.removeItem('admin_token');
   }
@@ -119,7 +119,7 @@ function logout() {
   localStorage.removeItem('admin_token');
   document.getElementById('lockScreen').style.display = 'block';
   document.getElementById('adminContent').style.display = 'none';
-  document.getElementById('tokenBox').style.display = 'none';
+  document.getElementById('logoutBtn').style.display = 'none';
   document.getElementById('adminToken').value = '';
 }
 
