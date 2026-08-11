@@ -38,8 +38,7 @@ const $ = (id) => document.getElementById(id);
 // cached state.live so it costs no extra network calls except the per-
 // township detail and forecast, which do need fresh localized text.
 function render() {
-  const vEl = document.getElementById('verdict'); if (vEl) vEl.style.display = 'none';
-  renderRibbon();
+  document.querySelectorAll('#verdict, .verdict, .verdict-text, [data-verdict]').forEach(el => el.style.display = 'none');  renderRibbon();
   renderGreening();
   fillCompare();
   fillTownshipPicker();
