@@ -1453,9 +1453,12 @@ footer { margin-top: 28px; }
 @keyframes rainFall { 0% { transform: translateY(-4px); opacity: 0; } 30% { opacity: 0.9; }
   100% { transform: translateY(10px); opacity: 0; } }
 .advice-art .rain-drop { animation: rainFall 0.9s linear infinite; }
-/* အပူချိန်အောက်က စာတန်းအထပ်ကို ဖျက်ခြင်း */
-.hero-temp-container #verdict,
-#verdict {
+/* အပူချိန်အောက်မှ စာတန်းအထပ်ကို လုံးဝ ဖျက်ဆီးခြင်း */
+#verdict,
+#vTitle, 
+.verdict,
+.verdict-tag,
+.verdict-text {
   display: none !important;
 }
 
